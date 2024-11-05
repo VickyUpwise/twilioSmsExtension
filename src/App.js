@@ -1,7 +1,8 @@
-import Demo from "./demo"
+import ChatComponent from "./chatComponent"
+
 export default function App()
 {
     return(
-      <Demo/>
+      <ChatComponent/>
     )
 }

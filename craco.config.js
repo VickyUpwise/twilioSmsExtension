@@ -1,4 +1,5 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path = require('path')
 
 module.exports = {
   webpack: {
@@ -21,5 +22,13 @@ module.exports = {
 
         return webpackConfig;
     }
-  }
+  },
+  resolve: {
+    fallback: {
+      "crypto": require.resolve("crypto-browserify"),
+      "fs" : false,
+      "url" : false,
+      "querystring": false,
+    },
+  },
 };
