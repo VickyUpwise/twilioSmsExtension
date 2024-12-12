@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Select, MenuItem } from "@mui/material";
-import { LuAlertCircle } from "react-icons/lu";
+import { FiAlertCircle } from "react-icons/fi";
 import { IoIosSend, IoMdPerson } from "react-icons/io";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
 import { MdOutlineWatchLater, MdDone, MdQueryBuilder } from "react-icons/md";
@@ -357,7 +357,7 @@ const ChatComponent = () => {
       case "delivered":
         return <IoCheckmarkDoneOutline />;
       case "failed":
-        return <LuAlertCircle />;
+        return <FiAlertCircle />;
       default:
         return null;
     }
