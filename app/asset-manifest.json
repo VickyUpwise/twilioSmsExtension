@@ -1,12 +1,18 @@
 {
   "files": {
-    "main.css": "./static/css/main.a66ac3e4.css",
-    "main.js": "./static/js/main.84322275.js",
+    "main.css": "./static/css/main.4db789a5.css",
+    "main.js": "./static/js/main.517702f2.js",
+    "settings.css": "./static/css/settings.4e24b03f.css",
+    "settings.js": "./static/js/settings.4539f271.js",
+    "bulkMessage.css": "./static/css/bulkMessage.f03adcac.css",
+    "bulkMessage.js": "./static/js/bulkMessage.b64a0aeb.js",
     "static/media/emptyChatLog.jpg": "./static/media/emptyChatLog.819f6083125d96866bb7.jpg",
+    "bulk.html": "./bulk.html",
+    "settings.html": "./settings.html",
     "index.html": "./index.html"
   },
   "entrypoints": [
-    "static/css/main.a66ac3e4.css",
-    "static/js/main.84322275.js"
+    "static/css/main.4db789a5.css",
+    "static/js/main.517702f2.js"
   ]
 }

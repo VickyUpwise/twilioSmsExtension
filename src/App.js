@@ -1,4 +1,4 @@
-import ChatComponent from "./chatComponent"
+import ChatComponent from "./ChatComponent/chatComponent"
 
 export default function App()
 {
