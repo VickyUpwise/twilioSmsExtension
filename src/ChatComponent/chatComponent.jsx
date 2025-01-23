@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Box, Select, MenuItem } from "@mui/material";
+import { Box, Select, MenuItem} from "@mui/material";
 import { FiAlertCircle } from "react-icons/fi";
 import { IoIosSend, IoMdPerson } from "react-icons/io";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
@@ -7,14 +7,18 @@ import { MdOutlineWatchLater, MdDone, MdQueryBuilder } from "react-icons/md";
 import { toast, ToastContainer } from "react-toastify";
 import { GrEmoji } from "react-icons/gr";
 import { RxCross1 } from "react-icons/rx";
-import { GrRefresh } from "react-icons/gr";
+import { TfiReload } from "react-icons/tfi";
 import { RiSlashCommands2 } from "react-icons/ri";
+import { CgAttachment } from "react-icons/cg";
 import emptyChatLog from "../utility/emptyChatLog.jpg";
 import axios from "axios";
 import EmojiPicker from "emoji-picker-react";
 import "./chatComponent.scss";
 import "react-toastify/dist/ReactToastify.css";
 import TemplateComponent from "../TemplateComponent/templateComponent";
+import MediaComponent from "../MediaComponent/mediaComponent";
+// import MediaPreviewer from "react-media-previewer";
+
 
 const ChatComponent = () => {
   const [env, setEnv] = useState({
@@ -36,12 +40,17 @@ const ChatComponent = () => {
   const [defaultNumber, setDefaultNumber] = useState("");
   const chatContainerRef = useRef(null);
   const [timer, setTimer] = useState(null); // Timer for countdown
-  const [isCountdownActive, setIsCountdownActive] = useState(false); //
+  const [isCountdownActive, setIsCountdownActive] = useState(false);
   const [timeoutId, setTimeoutId] = useState(null);
   const [messageSent, setMessageSent] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
   const [showTemplateComponent, setShowTemplateComponent] = useState(false);
   const [templateCont, setTemplateCont] = useState('')
+  const [attachment, setAttachment] = useState(null);
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [mediaComponent , setMediaComponent] = useState(false);
+  const [textareaHeight, setTextareaHeight] = useState(20);
+  
 
   //fetch the entity data and Twilio Account Details on pageload
   useEffect(() => {
@@ -131,12 +140,13 @@ const ChatComponent = () => {
       const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
       const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
       const twiliophonenumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
+      
 
       const sidContent = twilioSID.Success.Content;
       const tokenContent = twilioToken.Success.Content;
       const numberContent = currentTwilioNumber.Success.Content;
       const numberlist = JSON.parse(twiliophonenumbers.Success.Content);
-
+      
       if (sidContent === "") {
         setAccountSid("");
         toast.error("Account SID not present. Please refer to settings page.");
@@ -172,6 +182,8 @@ const ChatComponent = () => {
       else{
         setTwilioPhoneNumbers(numberlist)
       }
+
+      
     } catch (error) {
       console.error("Error getting Account Details", error);
       toast.error("Something went wrong. Please try again");
@@ -268,7 +280,7 @@ const ChatComponent = () => {
         const data = new URLSearchParams({
           Body: chunk, // Message content
           From: twiliophone, // Your Twilio phone number
-          To: defaultNumber, // Lead/Contact phone number
+          To: defaultNumber,// Lead/Contact phone number
         });
 
         const response = await axios.post(url, data, {
@@ -277,7 +289,7 @@ const ChatComponent = () => {
             "Content-Type": "application/x-www-form-urlencoded",
           },
         });
-
+        console.log('response', response)
         lastResponseStatus = response.status;
 
         if (response.status !== 201) {
@@ -291,9 +303,9 @@ const ChatComponent = () => {
 
       setNewMessage("");
       if(lastResponseStatus === 201){
-        console.log("Message sent called.")
         setMessageSent(true); 
         setRenderCount(0);
+        setShowTemplateComponent(!showTemplateComponent)
       }
       fetchPreviousMessagesFromTwilio();
       return { status: lastResponseStatus };
@@ -307,6 +319,38 @@ const ChatComponent = () => {
         toast.error("Message not sent. Please try again later.");
       }
       return { status: error.response?.status || null };
+    }
+  };
+
+  const sendAttachment = async () => {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const auth = {
+      username: accountSid,
+      password: authToken,
+    };
+  
+    const data = new URLSearchParams({
+      Body: attachmentUrl, // Attachment URL
+      From: twiliophone, // Your Twilio phone number
+      To: defaultNumber,// Lead/Contact phone number
+    });
+  
+    try {
+      const response = await axios.post(url, data, {
+        auth,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+  
+      if (response.status !== 201) {
+        throw new Error(`Attachment failed with status ${response.status}`);
+      }
+      fetchPreviousMessagesFromTwilio();
+      setAttachment('')
+      setAttachmentUrl('')
+
+      return response.status;
+    } catch (error) {
+      console.log('error sending attachment', error)
     }
   };
 
@@ -342,7 +386,12 @@ const ChatComponent = () => {
   const formatMessage = (message) => {
     const formattedMessage = message
       .replace("Sent from your Twilio trial account - ", "") // format the message according to chatting application
-      .replace(/\n/g, "<br />"); // handle line break in the chats.
+      .replace(/\n/g, "<br />") // handle line breaks in the chats
+      .replace(/(https?:\/\/[^\s]+)/g, (url) => {
+        // Make URLs clickable
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+      });
+  
     return formattedMessage;
   };
 
@@ -383,14 +432,23 @@ const ChatComponent = () => {
 
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
+
+    // Adjust the height dynamically
+    const textarea = e.target;
+    textarea.style.height = "30px"; // Reset height to auto to calculate correct scrollHeight
+    const newHeight = Math.min(textarea.scrollHeight, 90); // 200px is the max-height
+    textarea.style.height = `${newHeight}px`;
+    setTextareaHeight(newHeight);
   };
 
   const handleEmojiClick = (emojiObject) => {
     setNewMessage((prevMessage) => prevMessage + emojiObject.emoji);
   };
 
+  
+
   const handleSendMessageClick = () => {
-    if (!newMessage.trim()) {
+    if (!attachmentUrl && !newMessage.trim()) {
       toast.error("Message cannot be empty.");
       return;
     }
@@ -406,20 +464,47 @@ const ChatComponent = () => {
   const handleSendMessage = async () => {
     setIsCountdownActive(false); // Stop showing countdown
     setButtonState("loading");
+  
+    if (attachment && !attachmentUrl) {
+      alert("Attachment is still uploading. Please wait.");
+      setButtonState("idle");
+      return;
+    }
+  
     try {
-      const response = await sendMessage();
-      if (response.status === 201) {
-        setButtonState("success");
+      let isSuccess = false;
+  
+      if (newMessage && !attachmentUrl) {
+        // Case 1: Only message content
+        const response = await sendMessage();
+        isSuccess = response.status === 201;
+      } else if (!newMessage && attachmentUrl) {
+        // Case 2: Only attachment
+        const response = await sendAttachment();
+        isSuccess = response === 201;
+      } else if (newMessage && attachmentUrl) {
+        // Case 3: Both message and attachment
+        const attachmentResponse = await sendAttachment();
+        if (attachmentResponse === 201) {
+          const messageResponse = await sendMessage();
+          isSuccess = messageResponse.status === 201;
+        }
       } else {
-        setButtonState("error");
+        // Default Case: No message or attachment
+        toast.warn("Please provide a message or an attachment to send.");
+        setButtonState("idle");
+        return;
       }
+  
+      setButtonState(isSuccess ? "success" : "error");
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Error sending message or attachment:", error);
       setButtonState("error");
     }
+  
     setTimeout(() => setButtonState("idle"), 5000); // Reset button state after 5 seconds
   };
-
+  
   const cancelSendMessage = () => {
     clearTimeout(timeoutId); // Clear the timeout to cancel message sending
     setIsCountdownActive(false); // Stop countdown
@@ -440,13 +525,19 @@ const ChatComponent = () => {
     setTemplateCont(content);
     setNewMessage(content)
   };
+
+  const handleMediaComponent = () => {
+    setMediaComponent(!mediaComponent)
+  }
+
   return (
     <Box className="twilioChatContainer">
       <Box className="chatHeader">
         <div className="chatLogo"><IoMdPerson /></div>
+        <div className="detailsContainer">
         <div className="clientDetails">
-          <span>Conversation</span>
-          <span>with</span>
+          <span>Receiver:</span>
+          <span>{env.full_name}</span>
           <Select
             labelId="demo-simple-select-label"
             id="demo-simple-select"
@@ -459,10 +550,11 @@ const ChatComponent = () => {
               },
             }}
           >
-            <MenuItem value={env.phone}>{env.phone}</MenuItem>
-            <MenuItem value={env.mobile}>{env.mobile}</MenuItem>
+            <MenuItem value={env.phone}><span style={{fontSize: '15px', fontWeight: 'bold', margin: '0px 5px'}}>Phone</span>{env.phone}</MenuItem>
+            <MenuItem value={env.mobile}><span style={{fontSize: '15px', fontWeight: 'bold', margin: '0px 5px'}}>Mobile</span>{env.mobile}</MenuItem>
           </Select>
-          <span>from</span>
+        </div>
+        <div className="senderDetails">
           {
               twilioPhoneNumbers.length === 0 ? (
                 <p>No numbers available.</p>
@@ -490,7 +582,8 @@ const ChatComponent = () => {
           </Select>
           )
         }
-          <button id='refreshButton' onClick={handleRefershFeed}><GrRefresh /></button>
+          <button id='refreshButton' onClick={handleRefershFeed}><TfiReload /></button>
+        </div>
         </div>
       </Box>
       <Box className="chatContainer" ref={chatContainerRef}>
@@ -545,39 +638,54 @@ const ChatComponent = () => {
         )}
       </Box>
       <Box className="chatInputContainer">
-        {
-          showPopUp && (
-            <p>Character limit exceed, message will be sent in parts.</p>
-          )
-        }
-        {
-          showTemplateComponent && (
-            <TemplateComponent className='templateContainer' showTemplate={showTemplateComponent} handleTemplateContentChange={handleTemplateContentChange}/>
-          )
-        }
-        <button
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="emojiButton"
-        >
+        
+        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="emojiButton">
           <GrEmoji />
-        </button>
-        <button 
-        onClick={handleShowTemplate}
-        className="emojiButton"
-        >
-        <RiSlashCommands2 />
         </button>
         {showEmojiPicker && (
           <div style={{ position: "absolute", bottom: "14%", left: "5%", zIndex: 10 }}>
             <EmojiPicker onEmojiClick={handleEmojiClick} style={{width: '430px', height: '315px'}}/>
           </div>
         )}
-        <textarea
-          className="message-input"
-          value={newMessage}
-          onChange={handleInputChange}
-          placeholder="Type your message here..."
-        />
+        <button onClick={handleShowTemplate} className="emojiButton">
+          <RiSlashCommands2 />
+        </button>
+        {
+          showTemplateComponent && (
+            <TemplateComponent className='templateContainer' showTemplate={showTemplateComponent} handleTemplateContentChange={handleTemplateContentChange} setShowTemplateComponent={setShowTemplateComponent} setNewMessage={setNewMessage}/>
+          )
+        }
+        <button onClick={handleMediaComponent} className="emojiButton">
+          <CgAttachment/>
+        </button>
+        {
+          mediaComponent && (
+            <MediaComponent className="mediaComponent" mediaComponent={mediaComponent} attachment={attachment} attachmentUrl={attachmentUrl} setAttachment={setAttachment} setAttachmentUrl={setAttachmentUrl}/>
+          )
+        }
+        
+        
+        <div className="textarea-container">
+  <textarea
+    className={`message-input ${showPopUp ? "exceed-warning" : ""}`}
+    value={newMessage}
+    onChange={handleInputChange}
+    placeholder="Type your message here..."
+    style={{
+      height: newMessage ? `${textareaHeight}px` : "30px",
+      maxHeight: "90px", // Maximum height
+      overflowY: textareaHeight >= 90 ? "scroll" : "hidden", // Scroll only when maxHeight is reached
+      resize: "none", // Disable manual resizing
+      bottom: "0", // Stick to the bottom initially
+      transition: "transform 0.2s ease",
+    }}
+  />
+  {showPopUp && (
+    <div className="textarea-warning">
+      Character limit exceeded, message will be sent in parts.
+    </div>
+  )}
+</div>
         {
           !isCountdownActive ? (
         <button
@@ -598,7 +706,8 @@ const ChatComponent = () => {
         }
       </Box>
       <ToastContainer 
-        position="bottom-left"
+        position="top-center"
+        className="custom-toast-container"
         autoClose={5000}
         hideProgressBar={false}
         newestOnTop={false}

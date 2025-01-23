@@ -1,149 +1,213 @@
 import React, { useEffect, useState } from 'react';
 import './templateComponent.scss';
+import { IoIosArrowDropleft, IoIosArrowDropright } from "react-icons/io";
+import { LuPencil } from "react-icons/lu";
+import { RiDeleteBin6Line } from "react-icons/ri";
+import { RxCross2 } from "react-icons/rx";
+import { IoIosArrowBack } from "react-icons/io";
+import { MdOutlineDone } from "react-icons/md";
 
-const TemplateComponent = ({ showTemplate, handleTemplateContentChange }) => {
-  // State variables to manage templates, modal visibility, and pagination
-  const [templates, setTemplates] = useState([]); // List of templates
-  const [templateContent, setTemplateContent] = useState(''); // Current template content
-  const [currentPage, setCurrentPage] = useState(1); // Current page for pagination
-  const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
-  const [editingTemplate, setEditingTemplate] = useState(null); // Current template being edited/added
-  const [isEditing, setIsEditing] = useState(false); // Flag to check if editing or adding
+const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowTemplateComponent, setNewMessage}) => {
+  const [allTemplates, setAllTemplates] = useState([]); // List of templates
+  const [currentPage, setCurrentPage] = useState(1); // Current page
+  const [modalVisible, setModalVisible] = useState(false); // Modal visibility
+  const [editingTemplate, setEditingTemplate] = useState(null); // Template being edited
+  const [isEditing, setIsEditing] = useState(false); // Edit mode or Add mode
+  const perPage = 3; // Number of records per page
 
-  // Fetch all templates whenever showTemplate changes
+  // Current templates for the page
+  const currentTemplates = allTemplates.slice(
+    (currentPage - 1) * perPage,
+    currentPage * perPage
+  );
+
   useEffect(() => {
-    fetchAllRecords();
+    fetchAllRecords(); // Fetch records for the first page
   }, [showTemplate]);
 
-  // Function to fetch all records from Zoho CRM API
-  const fetchAllRecords = async (page = 1) => {
+  // Function to fetch records for the current page
+  const fetchAllRecords = async () => {
     try {
-      const allRecords = await ZOHO.CRM.API.getAllRecords({
+      const response = await ZOHO.CRM.API.getAllRecords({
         Entity: 'twiliophonenumbervalidatorbyupro__SMS_Templates',
         sort_order: 'asc',
-        per_page: 5, // Limit number of records per page
-        page, // Current page
+        per_page: 200,
+        page: 1,
       });
-      setTemplates(allRecords.data || []); // Update templates state
+      setAllTemplates(response.data || []); // Update templates
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching records:', error);
     }
   };
 
-  // Function to delete a template by ID
+  // Handle pagination
+  const handlePageChange = (direction) => {
+    const newPage = currentPage + direction;
+    const totalPages = Math.ceil(allTemplates.length / perPage);
+
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage); // Update the current page
+    }
+  };
+
+  // Function to delete a template
   const deleteTemplate = async (id) => {
     try {
       await ZOHO.CRM.API.deleteRecord({
         Entity: 'twiliophonenumbervalidatorbyupro__SMS_Templates',
         RecordID: id,
       });
-      fetchAllRecords(currentPage); // Refresh templates after deletion
+      const updatedTemplates = allTemplates.filter((template) => template.id !== id);
+      setAllTemplates(updatedTemplates); // Update the templates after deletion
+      if (currentPage > Math.ceil(updatedTemplates.length / perPage)) {
+        setCurrentPage((prev) => prev - 1); // Adjust the page if needed
+      } // Refresh templates
     } catch (error) {
       console.error('Error deleting template:', error);
     }
   };
 
-  // Handle click on the edit button
+  // Handle edit click
   const handleEditClick = (template) => {
-    setIsEditing(true); // Set editing mode
-    setEditingTemplate(template); // Set the selected template for editing
-    setModalVisible(true); // Show modal
+    setIsEditing(true);
+    setEditingTemplate(template);
+    setModalVisible(true);
   };
 
-  // Handle click on the add button
+  // Handle add click
   const handleAddClick = () => {
-    setIsEditing(false); // Set adding mode
-    // Set an empty template for the form
+    setIsEditing(false);
     setEditingTemplate({ Name: '', twiliophonenumbervalidatorbyupro__SMS_Content: '' });
-    setModalVisible(true); // Show modal
+    setModalVisible(true);
   };
 
-  // Save the template (add or update based on mode)
+  // Save template (add or update)
   const handleSaveTemplate = async () => {
     try {
       if (isEditing) {
-        // Update existing template
         await ZOHO.CRM.API.updateRecord({
           Entity: 'twiliophonenumbervalidatorbyupro__SMS_Templates',
-          // RecordID: editingTemplate.id,
           APIData: {
             id: editingTemplate.id,
             Name: editingTemplate.Name,
-            twiliophonenumbervalidatorbyupro__SMS_Content:
-              editingTemplate.twiliophonenumbervalidatorbyupro__SMS_Content,
+            twiliophonenumbervalidatorbyupro__SMS_Content: editingTemplate.twiliophonenumbervalidatorbyupro__SMS_Content,
           },
         });
       } else {
-        // Insert new template
         await ZOHO.CRM.API.insertRecord({
           Entity: 'twiliophonenumbervalidatorbyupro__SMS_Templates',
           APIData: {
             Name: editingTemplate.Name,
-            twiliophonenumbervalidatorbyupro__SMS_Content:
-              editingTemplate.twiliophonenumbervalidatorbyupro__SMS_Content,
+            twiliophonenumbervalidatorbyupro__SMS_Content: editingTemplate.twiliophonenumbervalidatorbyupro__SMS_Content,
           },
         });
       }
-
-      fetchAllRecords(currentPage); // Refresh templates after saving
-      setModalVisible(false); // Close modal
+      fetchAllRecords();
+      setModalVisible(false);
     } catch (error) {
       console.error('Error saving template:', error);
     }
   };
 
-  // Set the template content when a template is clicked
-  const handleTemplateClick = (content) => {
-    setTemplateContent(content); // Update content state
-  };
+  const handleCancelClick = () => {
+    setShowTemplateComponent(false)
+  }
 
-  // Handle pagination
-  const handlePageChange = (direction) => {
-    const newPage = currentPage + direction;
-    if (newPage > 0) { // Ensure page number is positive
-      setCurrentPage(newPage); // Update current page
-      fetchAllRecords(newPage); // Fetch records for the new page
-    }
-  };
+  const handleTemplateSelected = (message) => {
+    setNewMessage(message)
+  }
 
   return (
-    <div className="templateContainer">
-      {/* Show message if no templates exist */}
-      {templates.length === 0 ? (
-        <div>
+    <div className={modalVisible? 'modalContainer': 'templateContainer'}>
+      {allTemplates.length === 0 ? (
+        <div className="templateInnerContainer">
           <p>Make your task easy by creating some templates.</p>
-          <button onClick={handleAddClick}>Add</button>
-        </div>
-      ) : (
-        <div className='templateInnerContainer'>
-          {/* Add button for adding new templates */}
-          <button onClick={handleAddClick}>Add</button>
-          {/* Pagination controls */}
-          <div className="pagination">
-            <button onClick={() => handlePageChange(-1)}>Previous</button>
-            {/* Render each template */}
-          {templates.map((template) => (
-            <div
-              key={template.id}
-              className="template"
-              onClick={() => handleTemplateContentChange(template.twiliophonenumbervalidatorbyupro__SMS_Content)}
+          <div className="templateActionButton">
+            <button
+              className="teamplateAddButton"
+              style={{ transform: 'rotate(45deg)' }}
+              onClick={handleAddClick}
             >
-              <h5>{template.Name}</h5>
-              <div className="templateActions">
-                <button onClick={() => handleEditClick(template)}>Edit</button>
-                <button onClick={() => deleteTemplate(template.id)}>Delete</button>
+              <RxCross2 />
+            </button>
+            <button
+              className="teamplateAddButton"
+              onClick={handleCancelClick}
+            >
+              <RxCross2 />
+            </button>
+          </div>
+        </div>
+      ) : !modalVisible && (
+        <div className="templateInnerContainer">
+          <div className="pagination">
+            <button
+              onClick={() => handlePageChange(-1)}
+              className="teamplatePreviousButton"
+              disabled={currentPage === 1}
+              style={{ left: '0rem' }}
+            >
+              <IoIosArrowDropleft />
+            </button>
+            {currentTemplates.map((template) => (
+              <div
+                key={template.id}
+                className="template"
+                // onClick={() =>
+                //   handleTemplateContentChange(
+                //     template.twiliophonenumbervalidatorbyupro__SMS_Content
+                //   )
+                // }
+              >
+                <div className="templateHeader">
+                  <h5>{template.Name}</h5>
+                  <div className="templateActions">
+                  <button onClick={() => handleTemplateSelected(template.twiliophonenumbervalidatorbyupro__SMS_Content)}>
+                  <MdOutlineDone />
+                    </button>
+                    <button onClick={() => handleEditClick(template)}>
+                      <LuPencil />
+                    </button>
+                    <button onClick={() => deleteTemplate(template.id)}>
+                      <RiDeleteBin6Line />
+                    </button>
+                  </div>
+                </div>
+                <p>{template.twiliophonenumbervalidatorbyupro__SMS_Content}</p>
               </div>
-            </div>
-          ))}
-            <button onClick={() => handlePageChange(1)}>Next</button>
+            ))}
+          
+            <button
+              onClick={() => handlePageChange(1)}
+              className="teamplatePreviousButton"
+              disabled={currentPage === Math.ceil(allTemplates.length / perPage)}
+              style={{ right: '0rem' }}
+            >
+              <IoIosArrowDropright />
+            </button>
+          </div>
+          <div className="templateActionButton">
+            <button
+              className="teamplateAddButton"
+              style={{ transform: 'rotate(45deg)' }}
+              onClick={handleAddClick}
+            >
+              <RxCross2 />
+            </button>
+            <button
+              className="teamplateAddButton"
+              onClick={handleCancelClick}
+            >
+              <RxCross2 />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Modal for Editing/Adding Templates */}
       {modalVisible && (
         <div className="modal">
           <div className="modalContent">
+          <button className='modalBackButton' onClick={() => setModalVisible(false)}><IoIosArrowBack /></button>
             <h4>{isEditing ? 'Edit Template' : 'Add Template'}</h4>
             <input
               type="text"
@@ -154,7 +218,7 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange }) => {
               }
             />
             <textarea
-              placeholder="Template Content"
+              placeholder="type your content here....."
               value={
                 editingTemplate?.twiliophonenumbervalidatorbyupro__SMS_Content || ''
               }
@@ -165,8 +229,9 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange }) => {
                 })
               }
             />
-            <button onClick={handleSaveTemplate}>Save</button>
-            <button onClick={() => setModalVisible(false)}>Cancel</button>
+            <div className='saveButtonContainer'>
+            <button className='modalSaveButton' onClick={handleSaveTemplate}>Save</button>
+            </div>
           </div>
         </div>
       )}

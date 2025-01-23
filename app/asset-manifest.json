@@ -1,16 +1,19 @@
 {
   "files": {
-    "main.css": "./static/css/main.4f84a538.css",
-    "main.js": "./static/js/main.f2d2df4c.js",
+    "main.css": "./static/css/main.5b60c07d.css",
+    "main.js": "./static/js/main.d4194856.js",
     "settings.css": "./static/css/settings.8c5592d0.css",
-    "settings.js": "./static/js/settings.7384f6db.js",
+    "settings.js": "./static/js/settings.887343b3.js",
     "bulkMessage.css": "./static/css/bulkMessage.f03adcac.css",
-    "bulkMessage.js": "./static/js/bulkMessage.5104306f.js",
+    "bulkMessage.js": "./static/js/bulkMessage.2e44e520.js",
+    "static/media/Skate.mp4": "./static/media/Skate.0b142805becc8dbd2e40.mp4",
+    "static/media/Loading.gif": "./static/media/Loading.240be66bca97d7a67830.gif",
     "static/media/emptyChatLog.jpg": "./static/media/emptyChatLog.819f6083125d96866bb7.jpg",
+    "static/media/544 404 Error Text High Res Vector Graphics.jpeg": "./static/media/544 404 Error Text High Res Vector Graphics.e1079c3c86405881baf0.jpeg",
     "index.html": "./index.html"
   },
   "entrypoints": [
-    "static/css/main.4f84a538.css",
-    "static/js/main.f2d2df4c.js"
+    "static/css/main.5b60c07d.css",
+    "static/js/main.d4194856.js"
   ]
 }

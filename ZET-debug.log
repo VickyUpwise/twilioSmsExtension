@@ -102,3 +102,51 @@ Error: listen EADDRINUSE: address already in use :::5000
     at Module._load (node:internal/modules/cjs/loader:1023:12)
     at Module.require (node:internal/modules/cjs/loader:1235:19)
     at require (node:internal/modules/helpers:176:18)
+[error] [2024-12-27T07:34:30.502Z] : uncaughtException: Cannot set headers after they are sent to the client
+Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:652:11)
+    at ServerResponse.header (E:\Twilio_sms_extension\node_modules\express\lib\response.js:794:10)
+    at ServerResponse.send (E:\Twilio_sms_extension\node_modules\express\lib\response.js:174:12)
+    at ServerResponse.json (E:\Twilio_sms_extension\node_modules\express\lib\response.js:278:15)
+    at E:\Twilio_sms_extension\server\index.js:91:21
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2024-12-27T07:54:18.194Z] : uncaughtException: Cannot set headers after they are sent to the client
+Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:652:11)
+    at ServerResponse.header (E:\Twilio_sms_extension\node_modules\express\lib\response.js:794:10)
+    at ServerResponse.send (E:\Twilio_sms_extension\node_modules\express\lib\response.js:174:12)
+    at ServerResponse.json (E:\Twilio_sms_extension\node_modules\express\lib\response.js:278:15)
+    at E:\Twilio_sms_extension\server\index.js:91:21
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2024-12-27T08:03:13.497Z] : uncaughtException: Cannot set headers after they are sent to the client
+Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:652:11)
+    at ServerResponse.header (E:\Twilio_sms_extension\node_modules\express\lib\response.js:794:10)
+    at ServerResponse.send (E:\Twilio_sms_extension\node_modules\express\lib\response.js:174:12)
+    at ServerResponse.json (E:\Twilio_sms_extension\node_modules\express\lib\response.js:278:15)
+    at E:\Twilio_sms_extension\server\index.js:91:21
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2024-12-30T09:50:19.621Z] : uncaughtException: Cannot read properties of undefined (reading 'data')
+TypeError: Cannot read properties of undefined (reading 'data')
+    at E:\Twilio_sms_extension\server\index.js:196:49
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2024-12-30T09:59:01.514Z] : uncaughtException: Cannot read properties of undefined (reading 'data')
+TypeError: Cannot read properties of undefined (reading 'data')
+    at E:\Twilio_sms_extension\server\index.js:196:49
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2025-01-08T12:34:37.971Z] : uncaughtException: Cannot read properties of undefined (reading 'data')
+TypeError: Cannot read properties of undefined (reading 'data')
+    at E:\Twilio_sms_extension\server\index.js:207:49
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] [2025-01-13T15:43:37.438Z] : uncaughtException: data should be a string, Buffer or Uint8Array
+TypeError: data should be a string, Buffer or Uint8Array
+    at RedirectableRequest.write (E:\Twilio_sms_extension\node_modules\follow-redirects\index.js:136:11)
+    at FormData.ondata (node:internal/streams/legacy:20:31)
+    at FormData.emit (node:events:514:28)
+    at CombinedStream.write (E:\Twilio_sms_extension\node_modules\combined-stream\lib\combined_stream.js:138:8)
+    at CombinedStream._pipeNext (E:\Twilio_sms_extension\node_modules\combined-stream\lib\combined_stream.js:126:8)
+    at CombinedStream._realGetNext (E:\Twilio_sms_extension\node_modules\combined-stream\lib\combined_stream.js:99:10)
+    at CombinedStream._getNext (E:\Twilio_sms_extension\node_modules\combined-stream\lib\combined_stream.js:82:12)
+    at DelayedStream.emit (node:events:526:35)
+    at DelayedStream._handleEmit (E:\Twilio_sms_extension\node_modules\delayed-stream\lib\delayed_stream.js:82:15)
+    at source.emit (E:\Twilio_sms_extension\node_modules\delayed-stream\lib\delayed_stream.js:29:19)
