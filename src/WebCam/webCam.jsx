@@ -6,7 +6,7 @@ import { MdOutlineCameraswitch } from "react-icons/md";
 import { SlReload } from "react-icons/sl";
 import { MdOutlineDone } from "react-icons/md";
 
-const CustomWebcam = ({ onImageCapture }) => {
+const CustomWebcam = ({ onImageCapture, onClose}) => {
   const webcamRef = useRef(null);
   const [imgSrc, setImgSrc] = useState(null);
   const [mirrored, setMirrored] = useState(false);
@@ -39,6 +39,11 @@ const CustomWebcam = ({ onImageCapture }) => {
     }
   };
 
+  const handleUserMediaError = (error) => {
+    console.error("Error accessing webcam:", error);
+    onClose(false); // Close the webcam component if permission is denied
+  };
+
   return (
     <div className="webcamContainer">
       {!imgSrc ? (
@@ -51,6 +56,7 @@ const CustomWebcam = ({ onImageCapture }) => {
             screenshotFormat="image/jpeg"
             screenshotQuality={0.8}
             className="webcam"
+            onUserMediaError={handleUserMediaError}
           />
           <div className="cameraOverlay">
             <div className="mirrorToggle">

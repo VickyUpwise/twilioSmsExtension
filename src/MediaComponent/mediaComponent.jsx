@@ -7,10 +7,10 @@ import { toast} from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import FilePreview from "../MediaPreview/mediaPreview";
 import CustomWebcam from "../WebCam/webCam";
-import loadingVideo from '../utility/Skate.mp4'
 import Waveloading from '../utility/Loading.gif'
-import errorImage from '../utility/544 404 Error Text High Res Vector Graphics.jpeg'
+import errorImage from '../utility/404Error.jpeg'
 import { TbXboxX } from "react-icons/tb";
+import { SiFusionauth } from "react-icons/si";
 
 const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachment, setAttachmentUrl, }) => {
   const [fileType, setFileType] = useState(null);
@@ -25,7 +25,7 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
   const clientSecretRef = useRef("");
   const refreshTokenRef = useRef("");
   const parentIdRef = useRef("");
-  const REDIRECT_URI = "https://workdrive.zoho.com/";
+  const REDIRECT_URI = "https://plugin-twiliophonenumbervalidatorbyupro.zohosandbox.com/crm/tab/Leads/";
 
   useEffect(() => {
     console.log("useffect called")
@@ -71,8 +71,9 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
 
   // Step 1: Redirect user to Zoho OAuth Authorization Page
   // const initiateZohoAuth = () => {
-  //   console.log('client id', clientId)
-  //   const authUrl = `https://accounts.zoho.com/oauth/v2/auth?response_type=code&client_id=${clientId}&scope=WorkDrive.files.ALL&redirect_uri=${REDIRECT_URI}&access_type=offline&prompt=consent`;
+  //   console.log('client id', clientIdRef.current)
+  //   const authUrl = `https://accounts.zoho.com/oauth/v2/auth?response_type=code&client_id=${clientIdRef.current}&scope=WorkDrive.users.ALL,WorkDrive.files.ALL,WorkDrive.links.ALL,WorkDrive.team.ALL&redirect_uri=${REDIRECT_URI}&access_type=offline&prompt=consent`;
+  //   // window.location.href = authUrl;
   //   const popup = window.open(authUrl, "_blank", "width=500,height=700");
   //   const interval = setInterval(() => {
   //     try {
@@ -81,25 +82,38 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
   //         alert("Authorization process interrupted.");
   //       } else if (popup.location.href.includes("code")) {
   //         const code = new URL(popup.location.href).searchParams.get("code");
+  //         console.log('get code from popup', code)
   //         fetchAccessToken(code);
   //         popup.close();
   //         clearInterval(interval);
   //       }
   //     } catch (e) {
-  //       // Cross-origin restriction; ignore
+  //       console.log("Cross-origin restriction", e)
   //     }
   //   }, 1000);
   // };
 
   // Step 2: Exchange Authorization Code for Access Token
+
+  // useEffect(() => {
+  //   console.log("useeffect code for url code.")
+  //   const urlParams = new URLSearchParams(window.location.search);
+  //   const code = urlParams.get("code"); // Extract the code from the URL
+  
+  //   if (code) {
+  //     // If the authorization code is present, exchange it for an access token
+  //     fetchAccessToken(code);
+  //   }
+  // }, []);
+
   //   const fetchAccessToken = async (code) => {
   //   try {
   //     const response = await axios.post(
   //       "https://accounts.zoho.com/oauth/v2/token",
   //       new URLSearchParams({
   //         code: code, // The authorization code received
-  //         client_id: clientId, // Your client ID from API Console
-  //         client_secret: clientSecret, // Your client secret from API Console
+  //         client_id: clientIdRef.current, // Your client ID from API Console
+  //         client_secret: clientSecretRef.current, // Your client secret from API Console
   //         redirect_uri: REDIRECT_URI, // The redirect URI configured in API Console
   //         grant_type: "authorization_code", // Always "authorization_code" for this flow
   //       }),
@@ -112,8 +126,8 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
 
   //     const { access_token, refresh_token } = response.data;
   //     console.log("Access Token:", access_token);
-  //     setAccessToken(access_token);
-  //     setRefreshToken(refresh_token);
+  //     accessTokenRef.current = access_token
+  //     refreshTokenRef.current = refresh_token
   //   } catch (error) {
   //     console.error("Error fetching access token:", error.response?.data || error);
   //     alert("Failed to fetch access token. Please try again.");
@@ -129,14 +143,6 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
 
   console.log("Access token being used:", token);
 
-  // if (!token) {
-  //   // Fetch the token if it's missing
-  //   const aToken = await ZOHO.CRM.API.getOrgVariable(
-  //     "twiliophonenumbervalidatorbyupro__work_drive_access_token"
-  //   );
-  //   token = aToken.Success.Content;
-  //   accessTokenRef.current = token;
-  // }
 
   try {
     const response = await axios.post(
@@ -189,7 +195,7 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
     }
   };
 
-  const handleFileSelection = (file) => {
+  const handleFileSelection = async (file) => {
     if (file.size > 250 * 1024 * 1024) {
       toast.error(
         "File size exceeds 250MB limit. Please reduce the file size."
@@ -197,8 +203,13 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
       return;
     }
     setAttachment(file);
-    setShowOptions(false); // Hide the options card
+    setShowOptions(false);// Hide the options card 
     uploadFileToZoho(file);
+    // if(!accessTokenRef.current && !refreshTokenRef.current){
+    //   toast.error('Please Authorize Zoho WorkDrive.')
+    //   return;
+    // }
+    // else{}
   };
 
   const handleCameraClick = () => {
@@ -323,77 +334,6 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
   };
 
   return (
-    // <Box className="mediaInnerComponent"
-    //   sx={{
-    //     display: "flex",
-    //     flexDirection: "column",
-    //     position: "absolute",
-    //     bottom: '58px',
-    //     left: '80px',
-    //   }}
-    // >
-    //   {showOptions ? (
-    //           <div className="navigation">
-    //             <ul className="menu">
-    //             {options.map((option, index) => (
-    //               <li key={index} className="list" onMouseEnter={() => {
-    //                 setActive(index);
-    //                 setShowIndicartor(true);
-    //               }}
-    //               onMouseleave={() => { setActive(0);
-    //                 setShowIndicartor(false);}}>
-    //                 <div
-    //                   className="menu-link"
-    //                   onClick={() => {
-    //                     option.onClick();
-    //                   }}
-                      
-    //                 >
-    //                   <div className='icon'>
-    //                     {option.icon}
-    //                   </div>
-    //                   <span className='text'>
-    //                     {option.name}
-    //                   </span>
-    //                 </div>
-    //               </li>
-    //             ))}
-    //           </ul>
-    //           {
-    //             showIndicator && 
-    //           <div className="indicator" style={{
-    //       transform: `translateX(${options[active].dis}px)`,
-    //     }}></div>
-    //           }
-    //         </div>
-    //   ) : !showError && !attachmentUrl ? (
-    //     <Box className="loadingVideoContainer">
-    //           {/* <video
-    //             src={loading}
-    //             autoPlay
-    //             loop
-    //             muted
-    //             className="loadingVideo"
-    //           /> */}
-    //           <img src={Waveloading} alt='Loading' className="loadingVideo"/>
-    //           <span id="loadingcaption">Getting it. Wait a bit..</span>
-    //     </Box>
-    //   ) : showError ? (
-    //     <Box className='errorComponent'>
-    //       <img  className="loadingVideo" src={errorImage} alt="error" />
-    //       <button onClick={handleShowError} id="errorButton"><TbXboxX /></button>
-    //     </Box>
-    //   ) : (
-    //     <Box className="filePreviewContainer">
-    //       <FilePreview fileType={fileType} attachment={attachment} remove={handleRemove} />
-    //     </Box>
-    //   )}
-    //   {showWebcam && (
-    //     <CustomWebcam
-    //       onImageCapture={handleImageCapture} // Pass the handler for image capture
-    //     />
-    //   )}
-    // </Box>
     <Box
   className="mediaInnerComponent"
   sx={{
@@ -462,7 +402,14 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
       />
     </Box>
   ) : null}
-  {showWebcam && <CustomWebcam onImageCapture={handleImageCapture} />}
+  {showWebcam && <CustomWebcam onImageCapture={handleImageCapture} onClose={setShowWebcam}/>}
+  {/* { (!accessTokenRef.current && !refreshTokenRef.current) &&<div>
+    
+     <p>Authorize Zoho Workdrive</p>
+    <button className='emojiButton'onClick={() => initiateZohoAuth()}>
+    <SiFusionauth />
+    </button>
+  </div> } */}
 </Box>
 
   );

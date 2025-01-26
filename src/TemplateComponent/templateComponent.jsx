@@ -173,7 +173,7 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowT
                     </button>
                   </div>
                 </div>
-                <p>{template.twiliophonenumbervalidatorbyupro__SMS_Content}</p>
+                <div className='templateContent'>{template.twiliophonenumbervalidatorbyupro__SMS_Content}</div>
               </div>
             ))}
           

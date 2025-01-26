@@ -74,6 +74,8 @@
     width: 20rem;
     margin: 0px 10px;
     transition: 0.5s;
+    height: 5rem;
+
 
     &:hover{
       transform: scale(0.9);
@@ -95,13 +97,18 @@
               }
             }
         
-            p{
+            .templateContent{
               margin: 0.5rem 0 0;
               font-size: 12px;
               font-family: "Nunito", sans-serif;
               color: #333;
               width: 100%;
               text-align: justify;
+              display: -webkit-box;
+              -webkit-line-clamp: 3; /* Number of lines to show */
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
         
             .templateActions {

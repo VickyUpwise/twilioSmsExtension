@@ -7,16 +7,19 @@ import { MdOutlineWatchLater, MdDone, MdQueryBuilder } from "react-icons/md";
 import { toast, ToastContainer } from "react-toastify";
 import { GrEmoji } from "react-icons/gr";
 import { RxCross1 } from "react-icons/rx";
-import { TfiReload } from "react-icons/tfi";
+import { TbReload } from "react-icons/tb";
 import { RiSlashCommands2 } from "react-icons/ri";
 import { CgAttachment } from "react-icons/cg";
-import emptyChatLog from "../utility/emptyChatLog.jpg";
+import emptyChatLog from "../utility/emptyChatLog.png";
 import axios from "axios";
 import EmojiPicker from "emoji-picker-react";
 import "./chatComponent.scss";
 import "react-toastify/dist/ReactToastify.css";
 import TemplateComponent from "../TemplateComponent/templateComponent";
 import MediaComponent from "../MediaComponent/mediaComponent";
+import eclipse from '../utility/reload.gif'
+import Divider from '@mui/material/Divider';
+import Chip from '@mui/material/Chip';
 // import MediaPreviewer from "react-media-previewer";
 
 
@@ -50,6 +53,7 @@ const ChatComponent = () => {
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [mediaComponent , setMediaComponent] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState(20);
+  const [refreshFeed, setRefreshFeed] = useState(false)
   
 
   //fetch the entity data and Twilio Account Details on pageload
@@ -241,6 +245,7 @@ const ChatComponent = () => {
           (a, b) => new Date(a.date_sent) - new Date(b.date_sent)
         );
         setMessages(allMessages);
+        setRefreshFeed(false)
       } catch (error) {
         console.error("Error fetching messages from Twilio:", error);
         toast.error("Network Error, Chat history not loaded");
@@ -434,7 +439,7 @@ const ChatComponent = () => {
     setNewMessage(e.target.value);
 
     // Adjust the height dynamically
-    const textarea = e.target;
+    const textarea = newMessage.length;
     textarea.style.height = "30px"; // Reset height to auto to calculate correct scrollHeight
     const newHeight = Math.min(textarea.scrollHeight, 90); // 200px is the max-height
     textarea.style.height = `${newHeight}px`;
@@ -513,7 +518,7 @@ const ChatComponent = () => {
   };
 
   const handleRefershFeed = () => {
-    toast("Refreshing the feed. Please wait....")
+    setRefreshFeed(true)
     fetchPreviousMessagesFromTwilio();
   }
 
@@ -582,7 +587,8 @@ const ChatComponent = () => {
           </Select>
           )
         }
-          <button id='refreshButton' onClick={handleRefershFeed}><TfiReload /></button>
+          <button id='refreshButton' onClick={handleRefershFeed}>
+            {refreshFeed ? <img src={eclipse} alt="" />: <TbReload />}</button>
         </div>
         </div>
       </Box>
@@ -598,9 +604,11 @@ const ChatComponent = () => {
             return (
               <React.Fragment key={message.sid}>
                 {showDateSeparator && (
-                  <div className="dateSeparator">
-                    {formatDate(message.date_sent)}
-                  </div>
+                  <Divider>
+                      <div className="dateSeparator">
+                      {formatDate(message.date_sent)}
+                      </div>
+                  </Divider>
                 )}
                 <div className={`message ${isSent ? "sent" : "received"}`}>
                   <div className="messageContent">
@@ -631,9 +639,9 @@ const ChatComponent = () => {
           })
         ) : (
           <div className="emptyContainer">
-            <p>No messages here yet......</p>
+            
             <img src={emptyChatLog} />
-            <p>Send a message</p>
+           
           </div>
         )}
       </Box>
@@ -655,14 +663,14 @@ const ChatComponent = () => {
             <TemplateComponent className='templateContainer' showTemplate={showTemplateComponent} handleTemplateContentChange={handleTemplateContentChange} setShowTemplateComponent={setShowTemplateComponent} setNewMessage={setNewMessage}/>
           )
         }
-        <button onClick={handleMediaComponent} className="emojiButton">
+        {/* <button onClick={handleMediaComponent} className="emojiButton">
           <CgAttachment/>
         </button>
         {
           mediaComponent && (
             <MediaComponent className="mediaComponent" mediaComponent={mediaComponent} attachment={attachment} attachmentUrl={attachmentUrl} setAttachment={setAttachment} setAttachmentUrl={setAttachmentUrl}/>
           )
-        }
+        } */}
         
         
         <div className="textarea-container">
