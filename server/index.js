@@ -14,7 +14,7 @@ var chalk = require('chalk');
 var cors = require('cors')
 var axios = require('axios')
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+// const upload = multer({ dest: 'uploads/' });
 const FormData = require('form-data');
 
 process.env.PWD = process.env.PWD || process.cwd();
@@ -138,76 +138,132 @@ const fetchMyFolderId = async (accessToken) => {
   }
 };
 
-expressApp.post('/upload', upload.single('content'), async (req, res) => {
-  try {
-    const accessToken = req.headers.authorization?.split(" ")[1];
-    const file = req.file;
+// expressApp.post('/upload', upload.single('content'), async (req, res) => {
+//   try {
+//     const accessToken = req.headers.authorization?.split(" ")[1];
+//     const file = req.file;
 
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+//     if (!file) {
+//       return res.status(400).json({ error: 'No file uploaded' });
+//     }
     
-    let parentId = req.headers.parentId;
-    if (!parentId) {
-      parentId = await fetchMyFolderId(accessToken);
-    }
+//     let parentId = req.headers.parentId;
+//     if (!parentId) {
+//       parentId = await fetchMyFolderId(accessToken);
+//     }
     
-    const linkName = file.originalname;
-    const formData = new FormData();
-    formData.append('parent_id', parentId);
-    formData.append('content', fs.createReadStream(file.path));
-    formData.append('filename', linkName)
-    formData.append('override-name-exist', "true")
+//     const linkName = file.originalname;
+//     const formData = new FormData();
+//     formData.append('parent_id', parentId);
+//     formData.append('content', fs.createReadStream(file.path));
+//     formData.append('filename', linkName)
+//     formData.append('override-name-exist', "true")
 
-    const headers = {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        ...formData.getHeaders(), // Automatically sets 'Content-Type' including the boundary
-      };
+//     const headers = {
+//         Authorization: `Zoho-oauthtoken ${accessToken}`,
+//         ...formData.getHeaders(), // Automatically sets 'Content-Type' including the boundary
+//       };
       
+//     const response = await axios.post(
+//         "https://www.zohoapis.com/workdrive/api/v1/upload",
+//         formData,
+//         { headers }
+//       );
+
+//     const fileId = response.data.data[0].attributes.resource_id;
+//     const uploadUrl = response.data.data[0].attributes.permalink;
+
+//     let publicUrl= null;
+//     const shareResponse = await axios.post(
+//         'https://www.zohoapis.com/workdrive/api/v1/links',
+//         {
+//           data: {
+//             attributes: {
+//               resource_id: fileId, // The unique file ID
+//               link_name: linkName,
+//               request_user_data: "false",
+//               allow_download: "true",
+//               role_id: "34", // View permission (as per API docs)
+//             },
+//             type: "links",
+//           },
+//         },
+//         {
+//           headers: {
+//             Authorization: `Zoho-oauthtoken ${accessToken}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
+//       // Extract the public URL from the response
+//       publicUrl = shareResponse.data.data.attributes.link;
+
+//     res.json({ permalink: publicUrl, parentID: parentId, uploadURL : uploadUrl });
+//   } catch (error) {
+//     console.error('Error uploading file:', error);
+//     const errorMessage =
+//       error.response?.data?.errors?.[0]?.title || 'An unexpected error occurred.';
+//     console.log('Error details', errorMessage);
+//     return res
+//       .status(error.response?.status || 500)
+//       .json({ message: errorMessage });
+// }
+// });
+const upload = multer({ storage: multer.memoryStorage() });
+const TWILIO_FUNCTION_URL = "https://twiliomedia-4043.twil.io/upload";
+expressApp.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const { accountSid, authToken } = req.body; // Receive credentials from frontend
+    const { originalname, buffer } = req.file;
+    const fileData = buffer.toString("base64"); // Convert to Base64
+    const SERVICE_SID = "ZSb44119a3d069db77dc18ff65f6df22f7";
+
+    if (!accountSid || !authToken) {
+      return res.status(400).json({ error: "Missing Twilio credentials" });
+    }
+
+    // Encode credentials for Basic Auth
+    const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}:${SERVICE_SID}`).toString("base64")}`;
+
+    // Send file to Twilio Function with authentication
     const response = await axios.post(
-        "https://www.zohoapis.com/workdrive/api/v1/upload",
-        formData,
-        { headers }
-      );
-
-    const fileId = response.data.data[0].attributes.resource_id;
-    const uploadUrl = response.data.data[0].attributes.permalink;
-
-    let publicUrl= null;
-    const shareResponse = await axios.post(
-        'https://www.zohoapis.com/workdrive/api/v1/links',
-        {
-          data: {
-            attributes: {
-              resource_id: fileId, // The unique file ID
-              link_name: linkName,
-              request_user_data: "false",
-              allow_download: "true",
-              role_id: "34", // View permission (as per API docs)
-            },
-            type: "links",
-          },
+      TWILIO_FUNCTION_URL,
+      { fileData, fileName: originalname },
+      {
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      // Extract the public URL from the response
-      publicUrl = shareResponse.data.data.attributes.link;
+      }
+    );
 
-    res.json({ permalink: publicUrl, parentID: parentId, uploadURL : uploadUrl });
+    res.json({ url: response.data.url }); // Send Twilio Asset URL to frontend
   } catch (error) {
-    console.error('Error uploading file:', error);
-    const errorMessage =
-      error.response?.data?.errors?.[0]?.title || 'An unexpected error occurred.';
-    console.log('Error details', errorMessage);
-    return res
-      .status(error.response?.status || 500)
-      .json({ message: errorMessage });
-}
+    console.error("Error uploading to Twilio:", error.response ? error.response.data : error);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+// ✅ API to Verify Twilio Credentials
+expressApp.post("/verify-twilio", async (req, res) => {
+  const { accountSid, authToken } = req.body;
+
+  if (!accountSid || !authToken) {
+    return res.status(400).json({ error: "Missing Twilio SID or Auth Token" });
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`;
+
+  try {
+    const response = await axios.get(url, {
+      auth: { username: accountSid, password: authToken }
+    });
+
+    res.json({ valid: true, data: response.data });
+  } catch (error) {
+    console.error("❌ Twilio Verification Failed:", error.response?.data || error);
+    res.status(401).json({ valid: false, error: error.response?.data || "Authentication Failed" });
+  }
 });
 
 expressApp.post("/refresh-token", async (req, res) => {

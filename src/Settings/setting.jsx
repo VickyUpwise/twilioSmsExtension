@@ -3,6 +3,7 @@ import "./settings.scss";
 import { toast, ToastContainer } from "react-toastify";
 import CircularProgress from '@mui/material/CircularProgress';
 import "react-toastify/dist/ReactToastify.css";
+import { motion } from "framer-motion";
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import {
   Switch,
   Box, styled, TextField
 } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip'
 import { IoIosAddCircleOutline } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
 import neo1 from '../utility/C-HM Conseil .jpeg'
@@ -84,14 +86,17 @@ const NeomorphicTableRow = styled(TableRow)(({ isSelected }) => ({
 }));
 
 const AddButton = styled(IconButton)({
-  background: "#f0f0f3",
-  borderRadius: "50%",
-  boxShadow: "4px 4px 10px #bebebe, -4px -4px 10px #ffffff",
+  background: "#f6f4f4",
+  boxShadow: "-2px -4px 8px #fff, 2px 4px 7px #cccccc",
+  color: "#9e9e9e",
+  borderRadius: "8px",
   margin: "0 10px",
   transition: '0.4s',
-  padding: '0px',
+  padding: '5px 10px',
+  fontSize: '12px',
   "&:hover": {
-    transform: 'scale(1.1)'
+    boxShadow: "rgb(255, 255, 255) -1px -1px 4px inset, rgb(204, 204, 204) 3px 3px 3px inset",
+    background: '#f6f4f4'
   },
 });
 
@@ -107,6 +112,9 @@ const Settings = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [newTwilioField, setNewTwilioField] = useState({name: '', number: ''})
   const [showLoader, setShowLoader] = useState(false);
+  const [invaildSid, setInvalidSid] = useState(false);
+  const [invalidToken, setInvalidToken] = useState(false);
+  const [fetchNumber, setFetchNumber] = useState([])
 
   useEffect(() => {
     ZOHO.embeddedApp.on("PageLoad", fetchTwilioCredentials);
@@ -125,7 +133,6 @@ const Settings = () => {
       const tokenContent = twilioToken.Success.Content;
       const numberContent = currentTwilioNumber.Success.Content;
       const phoneNumbers = JSON.parse(twilioPhoneNumbers.Success.Content);
-      console.log('PhoneNumber', phoneNumbers)
   
       setTwilioSID(sidContent)
       setTwilioToken(tokenContent)
@@ -135,10 +142,90 @@ const Settings = () => {
       console.error("Error:", error);
     }
   };
+
+  useEffect(() => {
+      const fetchTwilioPhoneNumbers = async (accountSid, authToken) => {
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
+      
+        try {
+          const response = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
+            }
+          });
+      
+          if (response.ok) {
+            const data = await response.json();
+            console.log('twilio phone number',data)
+            const phoneNumbers = data.incoming_phone_numbers.map(num => num.phone_number);
+            setFetchNumber(phoneNumbers)
+            return { success: true, numbers: data.incoming_phone_numbers };
+          } else {
+            const errorData = await response.json();
+            console.error("❌ Failed to fetch Twilio phone numbers:", errorData);
+            return { success: false, error: errorData };
+          }
+        } catch (error) {
+          console.error("⚠️ Error fetching Twilio phone numbers:", error);
+          return { success: false, error };
+        }
+      };
+      if(twilioSID && twiliotoken){
+      fetchTwilioPhoneNumbers(twilioSID, twiliotoken);
+      }
+  },[twilioSID, twiliotoken])
   
+  const verifyTwilioCredentials = async (accountSid, authToken) => {
+    try {
+      const response = await fetch("https://127.0.0.1:5000/verify-twilio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ accountSid, authToken })
+      });
+  
+      const data = await response.json();
+  
+      if (data.valid) {
+        console.log("✅ Twilio Credentials Verified Successfully:", data);
+        return { valid: true, data };
+      } else {
+        console.error("❌ Invalid Twilio Credentials:", data.error);
+        return { valid: false, error: data.error };
+      }
+    } catch (error) {
+      console.error("⚠️ Error Verifying Twilio Credentials:", error);
+      return { valid: false, error };
+    }
+  };
 
   const saveCustomPropertiesOfTwilio = async () => {
     setShowLoader(true)
+    const twilioVerification = await verifyTwilioCredentials(twilioSID, twiliotoken);
+  if (!twilioVerification.valid) {
+    setShowLoader(false);
+
+    // Check if error is related to SID or Token
+    if(twilioVerification.error.code === 20003){
+      if (twilioVerification.error.message === "Authentication Error - invalid username") {
+        setInvalidSid(true);
+        toast.error("Invalid Twilio SID. Please check and try again.");
+      }
+      if (twilioVerification.error.message === "Authenticate") {
+        setInvalidToken(true);
+        toast.error("Invalid Twilio Auth Token. Please check and try again.");
+      } 
+    }
+    else {
+      toast.error("Twilio Credentials Verification Failed.");
+    }
+    
+    return; // **🚫 Stop execution if verification fails**
+  }
+  setInvalidSid(false)
+  setInvalidToken(false)
     const data = [
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_SID", value: twilioSID },
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_Token", value: twiliotoken },
@@ -189,25 +276,6 @@ const Settings = () => {
       ...updatedRows.filter((row) => row.number !== selectedRow.number),
     ]);
   };
-
-  // Handler to delete a phone number from the list
-  // const deletePhoneNumber = async (number, index) => {
-  //   setTwilioPhoneNumbers((prev) => 
-  //     prev.filter((_, i) => i !== index) // Remove the object at the specified index
-  //   );
-  //   if (currentTwilioNumber === number) {
-  //     setCurrentTwilioNumber(""); // Clear current number if it was deleted
-  //   }
-  //   const data = {apiname: "twiliophonenumbervalidatorbyupro__Phone_Numbers", value: twilioPhoneNumbers}
-  //   const request = await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set",  data);
-  //   const response = JSON.parse(request)
-  //   if(response.status_code === '200'){
-  //     toast('Number deleted successfully.')
-  //   }
-  //   else{
-  //     console.log("Respnse", response)
-  //   }
-  // };
 
   const handleDelete = async (rowIndex) => {
     const updatedRows = twilioPhoneNumbers.filter((_, index) => index !== rowIndex);
@@ -269,17 +337,17 @@ const Settings = () => {
       </div>
       <Box className='innerContainer'>
       <div className='inputContainer'>
-        <CustomTextField id="outlined-basic" label="Account SID" variant="outlined" value={twilioSID} onChange={() => handleTwilioSID(e.target.value)}/>
-        <CustomTextField id="outlined-basic" label="Account Token" type="password" variant="outlined" value={twiliotoken} onChange={() => handleTwilioToken(e.target.value)}/>
+        <CustomTextField id="outlined-basic" label="Account SID" variant="outlined" sx={{border: invaildSid ? '1px solid red' : ""}} value={twilioSID} onChange={(e) => handleTwilioSID(e.target.value)}/>
+        <CustomTextField id="outlined-basic" label="Account Token" type="password" variant="outlined" sx={{boder: invalidToken ? '1px solid red' : ""}} value={twiliotoken} onChange={(e) => handleTwilioToken(e.target.value)}/>
       </div>
         <div className='neomorphic-table'>
       <NeomorphicTableContainer>
         <Table>
           <TableHead>
             <TableRow>
-              <CustomTableCell>Friendly Name</CustomTableCell>
-              <CustomTableCell>Twilio Number</CustomTableCell>
-              <CustomTableCell align="center"> Action Toggle</CustomTableCell>
+              <CustomTableCell sx={{fontWeight: 'bold'}}>Friendly Name</CustomTableCell>
+              <CustomTableCell sx={{fontWeight: 'bold'}}>Twilio Number</CustomTableCell>
+              <CustomTableCell align="center" sx={{fontWeight: 'bold'}}>Set as Default</CustomTableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -323,10 +391,13 @@ const Settings = () => {
           )}
         </CustomTableCell>
         <CustomTableCell align="center">
+          <Tooltip title='Set as default Number'>
           <Switch
             checked={row.number === currentTwilioNumber}
             onChange={() => handleToggle(row)}
           />
+          </Tooltip>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -355,26 +426,60 @@ const Settings = () => {
           sx={{overflow:'hidden'
           }}
         />
-        
-        <AddButton onClick={() => setIsEditing(!isEditing)} sx={{transform: isEditing ? 'rotate(45deg)' : ''}}>
-        <IoIosAddCircleOutline />
+         <Tooltip title={isEditing ? "Cancel adding": "Add new number"}>
+        <AddButton onClick={() => setIsEditing(!isEditing)}>
+          {!isEditing ? "Add" : "Cancel"}
         </AddButton>
+         </Tooltip>
         {
           isEditing && (
-            <div className="newEditField">
-              <input placeholder="Friendly Name" type="text" name='name' value={newTwilioField.name} onChange={handleInputChange}/>
-              <input placeholder="Twilio Number"type="text" name='number' value={newTwilioField.number} onChange={handleInputChange}/>
-              <button onClick={handleSaveFeild}><MdOutlineDone /></button>
-            </div>
+            <motion.div
+  className="newEditField"
+  initial={{ x: -300, opacity: 0 }}
+  animate={{ x: isEditing ? 0 : -300, opacity: isEditing ? 1 : 0 }}
+  transition={{ duration: 1, ease: "easeInOut" }}
+>
+  <input 
+  required
+    placeholder="Friendly Name" 
+    type="text" 
+    name="name" 
+    value={newTwilioField.name} 
+    onChange={handleInputChange} 
+  />
+  <select
+          required
+          name="number"
+          value={newTwilioField.number}
+          onChange={handleInputChange }
+        >
+          {fetchNumber.map((num , index) => (
+            <option key={index} value={num}>
+              {num}
+            </option>
+          ))}
+        </select>
+  <Tooltip title="Save">
+    <button onClick={handleSaveFeild}>
+      <MdOutlineDone />
+    </button>
+  </Tooltip>
+</motion.div>
+            // <div className="newEditField">
+            //   <input placeholder="Friendly Name" type="text" name='name' value={newTwilioField.name} onChange={handleInputChange}/>
+            //   <input placeholder="Twilio Number"type="text" name='number' value={newTwilioField.number} onChange={handleInputChange}/>
+            //   <Tooltip title="Save">
+            //   <button onClick={handleSaveFeild}><MdOutlineDone /></button>
+            //   </Tooltip>
+            // </div>
           )
         }
       </div>
       <div className='saveButton'>
         <button onClick={saveCustomPropertiesOfTwilio}>
-          {/* {
-            showLoader ? <CircularProgress size={15}/> : 'Save'
-          } */}
-          <CircularProgress size={12}/>
+          {
+            showLoader ? <CircularProgress size={12}/> : 'Save'
+          }
         </button>
       </div>
 

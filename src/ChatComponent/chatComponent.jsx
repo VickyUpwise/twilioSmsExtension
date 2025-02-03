@@ -19,9 +19,7 @@ import TemplateComponent from "../TemplateComponent/templateComponent";
 import MediaComponent from "../MediaComponent/mediaComponent";
 import eclipse from '../utility/reload.gif'
 import Divider from '@mui/material/Divider';
-import Chip from '@mui/material/Chip';
-// import MediaPreviewer from "react-media-previewer";
-
+import loaderGIF from '../utility/Loader.gif'
 
 const ChatComponent = () => {
   const [env, setEnv] = useState({
@@ -42,9 +40,6 @@ const ChatComponent = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [defaultNumber, setDefaultNumber] = useState("");
   const chatContainerRef = useRef(null);
-  const [timer, setTimer] = useState(null); // Timer for countdown
-  const [isCountdownActive, setIsCountdownActive] = useState(false);
-  const [timeoutId, setTimeoutId] = useState(null);
   const [messageSent, setMessageSent] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
   const [showTemplateComponent, setShowTemplateComponent] = useState(false);
@@ -52,9 +47,10 @@ const ChatComponent = () => {
   const [attachment, setAttachment] = useState(null);
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [mediaComponent , setMediaComponent] = useState(false);
-  const [textareaHeight, setTextareaHeight] = useState(20);
   const [refreshFeed, setRefreshFeed] = useState(false)
-  
+  const textareaRef = useRef(null);
+  const [loadingMessages, setLoadingMessages] = useState(false); // Prevent multiple fetch calls
+  const nextPageTokenRef = useRef(null);
 
   //fetch the entity data and Twilio Account Details on pageload
   useEffect(() => {
@@ -79,36 +75,40 @@ const ChatComponent = () => {
   // fetch chat history
   useEffect(() => {
     if (twiliophone && defaultNumber) {
-      fetchPreviousMessagesFromTwilio();
+      setMessages([])
+      fetchPreviousMessagesFromTwilio(true);
     }
-  }, [defaultNumber, twiliophone]);
+}, [defaultNumber, twiliophone]);
 
-  useEffect(() => {
-    let intervalId;
-  
-    if (messageSent && renderCount === 0) {
-      // Only setup interval on the first execution
-      toast("Refreshing the feed. Please wait...");
-      fetchPreviousMessagesFromTwilio(); // Initial fetch
-      setRenderCount(1); // Set the render count to 1 to prevent duplicate intervals
-  
-      let currentCount = 1; // Local count to avoid state re-triggering
-  
-      intervalId = setInterval(() => {
-        if (currentCount >= 3) {
-          clearInterval(intervalId); // Stop the interval after 3 executions
-          setMessageSent(false); // Reset messageSent for the next use
-        } else {
-          toast("Refreshing the feed. Please wait...");
-          fetchPreviousMessagesFromTwilio();
-          currentCount++; // Increment local count
-          setRenderCount(currentCount); // Update render count
-        }
-      }, 110000); // 2 minutes interval
-    }
-  
-    return () => clearInterval(intervalId); // Clean up interval on component unmount
-  }, [messageSent]);
+useEffect(() => {
+  let intervalId;
+
+  if (messageSent && renderCount === 0) {
+      fetchPreviousMessagesFromTwilio(true);
+      setRenderCount(1);
+
+      let currentCount = 1;
+      let intervalTimes = [30000, 60000, 90000, 120000];
+
+      const executeFetch = () => {
+          if (currentCount >= intervalTimes.length) {
+              clearInterval(intervalId);
+              setMessageSent(false);
+          } else {
+              fetchPreviousMessagesFromTwilio(true);
+              currentCount++;
+              setRenderCount(currentCount);
+              toast(`refreshing the feed for ${currentCount} time.`);
+              intervalId = setTimeout(executeFetch, intervalTimes[currentCount]);
+          }
+      };
+
+      intervalId = setTimeout(executeFetch, intervalTimes[currentCount - 1]);
+  }
+
+  return () => clearTimeout(intervalId);
+}, [messageSent]);
+
   
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -118,24 +118,28 @@ const ChatComponent = () => {
   }, [messages]);
 
   useEffect(() => {
+    if (chatContainerRef.current) {
+        const handleScroll = () => {
+            if (chatContainerRef.current.scrollTop === 0) {
+                fetchPreviousMessagesFromTwilio();
+            }
+        };
+        chatContainerRef.current.addEventListener("scroll", handleScroll);
+        return () => chatContainerRef.current.removeEventListener("scroll", handleScroll);
+    }
+}, [twiliophone, defaultNumber]);
+
+  useEffect(() => {
     if (newMessage.length > 1600) {
       setShowPopUp(true); // Explicitly show the popup
     }
     else(
       setShowPopUp(false)
     )
+    if (!newMessage) {
+      textareaRef.current.style.height = "30px"; // Reset height after sending message
+  }
   }, [newMessage])
-
-  useEffect(() => {
-    if (isCountdownActive && timer > 0) {
-      const interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval); // Cleanup on component unmount or countdown stop
-    } else if (timer === 0 && isCountdownActive) {
-      handleSendMessage(); // Automatically send the message after countdown
-    }
-  }, [isCountdownActive, timer]);
 
   // fetching twilio account details.
   const fetchAccountDetails = async () => {
@@ -208,51 +212,85 @@ const ChatComponent = () => {
         phone: entityData.Phone || '',
         mobile: entityData.Mobile || '',
       }));
-      setDefaultNumber(entityData.Phone);
+      setDefaultNumber(entityData.Mobile || '');
     } catch (error) {
       console.log("error", error);
     }
   };
 
-  // Fetch Message history of the user and entity
-  const fetchPreviousMessagesFromTwilio = async () => {
-    if (!defaultNumber.startsWith("+")) {
+const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
+  if (!twiliophone || !defaultNumber) {
+      toast.error("Twilio phone number and default number must be set.");
+      return;
+  }
+  if (!defaultNumber.startsWith("+")) {
       toast.error("Phone/mobile number must include a country code.");
-    } else {
-      try {
-        const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+      return;
+  }
+  if (loadingMessages) return; // Prevent duplicate calls while fetching
+   // Stop fetching if no more messages left
+   if (!initialFetch && !nextPageTokenRef.current) {
+    toast.info("No more chat history.");
+    return;
+}
+  try {
+      setLoadingMessages(true); // Start fetching
+      const previousScrollHeight = chatContainerRef.current ? chatContainerRef.current.scrollHeight : 0;
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
 
-        // Fetch inbound and outbound messages
-        const [inboundResponse, outboundResponse] = await Promise.all([
-          axios.get(url, {
-            auth: { username: accountSid, password: authToken },
-            params: { From: defaultNumber, To: twiliophone },
-          }),
-          axios.get(url, {
-            auth: { username: accountSid, password: authToken },
-            params: { From: twiliophone, To: defaultNumber },
-          }),
-        ]);
+      let params = {
+          PageSize: 20, // Fetch 20 messages per request
+          To: defaultNumber,
+          From: twiliophone,
+      };
 
-        const inboundMessages = inboundResponse.data.messages;
-        const outboundMessages = outboundResponse.data.messages;
-
-        // Combine inbound and outbound messages
-        const allMessages = [...inboundMessages, ...outboundMessages];
-
-        // Sort messages by both date and time
-        allMessages.sort(
-          (a, b) => new Date(a.date_sent) - new Date(b.date_sent)
-        );
-        setMessages(allMessages);
-        setRefreshFeed(false)
-      } catch (error) {
-        console.error("Error fetching messages from Twilio:", error);
-        toast.error("Network Error, Chat history not loaded");
+      if (!initialFetch && nextPageTokenRef.current) {
+          params.PageToken = nextPageTokenRef.current; // Fetch next page
       }
-    }
-  };
 
+      const response = await axios.get(url, {
+          auth: { username: accountSid, password: authToken },
+          params: params,
+      });
+
+      const newMessages = response.data.messages || [];
+      console.log("Fetched messages:", newMessages);
+
+      if (newMessages.length === 0) {
+          console.log("No more messages to load.");
+          setLoadingMessages(false);
+          return;
+      }
+
+      // Sort messages by date
+      newMessages.sort((a, b) => new Date(a.date_sent) - new Date(b.date_sent));
+      setRefreshFeed(false)
+      // Prevent duplicate messages
+      setMessages((prevMessages) => {
+          const existingSids = new Set(prevMessages.map(msg => msg.sid));
+          const uniqueMessages = newMessages.filter(msg => !existingSids.has(msg.sid));
+          return initialFetch ? newMessages : [...uniqueMessages, ...prevMessages];
+      });
+
+      // Safely set next page token for pagination
+      const newPageToken = response.data.next_page_uri ? new URLSearchParams(response.data.next_page_uri).get('PageToken') : null;
+      nextPageTokenRef.current = newPageToken;
+      console.log("Next PageToken:", newPageToken);
+      if(!initialFetch){
+        setTimeout(() => {
+            if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight - previousScrollHeight;
+            }
+        }, 100);
+      }
+
+  } catch (error) {
+      console.error("Error fetching messages from Twilio:", error);
+      toast.error("Network Error, Chat history not loaded");
+  } finally {
+      setLoadingMessages(false); // Reset loading state
+  }
+};
   // Sending Message using twilio
   const MAX_TWILIO_CHAR_LIMIT = 1600; // Twilio's character limit for long messages
 
@@ -310,9 +348,9 @@ const ChatComponent = () => {
       if(lastResponseStatus === 201){
         setMessageSent(true); 
         setRenderCount(0);
-        setShowTemplateComponent(!showTemplateComponent)
+        setShowTemplateComponent(false)
       }
-      fetchPreviousMessagesFromTwilio();
+      fetchPreviousMessagesFromTwilio(true);
       return { status: lastResponseStatus };
     } catch (error) {
       console.error("Error sending message:", error);
@@ -335,7 +373,9 @@ const ChatComponent = () => {
     };
   
     const data = new URLSearchParams({
-      Body: attachmentUrl, // Attachment URL
+      MediaUrl: [
+        attachmentUrl,
+      ],
       From: twiliophone, // Your Twilio phone number
       To: defaultNumber,// Lead/Contact phone number
     });
@@ -349,9 +389,11 @@ const ChatComponent = () => {
       if (response.status !== 201) {
         throw new Error(`Attachment failed with status ${response.status}`);
       }
-      fetchPreviousMessagesFromTwilio();
+      console.log('Media response',response)
+      fetchPreviousMessagesFromTwilio(true);
       setAttachment('')
       setAttachmentUrl('')
+      setShowTemplateComponent(false);
 
       return response.status;
     } catch (error) {
@@ -416,8 +458,7 @@ const ChatComponent = () => {
         return null;
     }
   };
-
-  // Handling the choice between lead/contact mobile or phone number.
+  
   const handleDefaultNumberChange = (e) => {
     setDefaultNumber(e.target.value);
   };
@@ -429,6 +470,7 @@ const ChatComponent = () => {
         toast.error("Invalid selection. Please choose a valid number.");
       }
       setTwilioPhone(selectedValue);
+
     } catch (err) {
       console.error(err.message);
 
@@ -436,38 +478,39 @@ const ChatComponent = () => {
   };
 
   const handleInputChange = (e) => {
-    setNewMessage(e.target.value);
+    const value = e.target.value;
 
-    // Adjust the height dynamically
-    const textarea = newMessage.length;
-    textarea.style.height = "30px"; // Reset height to auto to calculate correct scrollHeight
-    const newHeight = Math.min(textarea.scrollHeight, 90); // 200px is the max-height
-    textarea.style.height = `${newHeight}px`;
-    setTextareaHeight(newHeight);
+    // Check for character limit and show warning
+    if (value.length > MAX_TWILIO_CHAR_LIMIT) {
+      setShowPopUp(true);
+    } else {
+      setShowPopUp(false);
+    }
+
+    setNewMessage(value);
+
+    // Adjust textarea height dynamically
+    textareaRef.current.style.height = "auto"; // Reset height
+    if (value.trim() === "" || newMessage.length === 0) {
+      textareaRef.current.style.height = "30px"; // Ensure it resets to min height
+  } else {
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Expand based on content
+  }
   };
 
   const handleEmojiClick = (emojiObject) => {
     setNewMessage((prevMessage) => prevMessage + emojiObject.emoji);
   };
 
-  
-
   const handleSendMessageClick = () => {
     if (!attachmentUrl && !newMessage.trim()) {
       toast.error("Message cannot be empty.");
       return;
     }
-    setIsCountdownActive(true); // Start the countdown
-    setTimer(10); // Set countdown to 10 seconds
-
-    const timeout = setTimeout(() => {
-      handleSendMessage();
-    }, 10000); // Send message after 10 seconds
-    setTimeoutId(timeout);
+    handleSendMessage();
   };
 
   const handleSendMessage = async () => {
-    setIsCountdownActive(false); // Stop showing countdown
     setButtonState("loading");
   
     if (attachment && !attachmentUrl) {
@@ -500,7 +543,13 @@ const ChatComponent = () => {
         setButtonState("idle");
         return;
       }
-  
+      if (isSuccess) {
+        setTimeout(() => {
+            if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+            }
+        }, 200); // Ensure chat stays at the bottom
+    }
       setButtonState(isSuccess ? "success" : "error");
     } catch (error) {
       console.error("Error sending message or attachment:", error);
@@ -510,16 +559,9 @@ const ChatComponent = () => {
     setTimeout(() => setButtonState("idle"), 5000); // Reset button state after 5 seconds
   };
   
-  const cancelSendMessage = () => {
-    clearTimeout(timeoutId); // Clear the timeout to cancel message sending
-    setIsCountdownActive(false); // Stop countdown
-    setTimer(null); // Reset timer
-    setButtonState(""); // Reset button state
-  };
-
   const handleRefershFeed = () => {
     setRefreshFeed(true)
-    fetchPreviousMessagesFromTwilio();
+    fetchPreviousMessagesFromTwilio(true);
   }
 
   const handleShowTemplate = () => {
@@ -529,6 +571,12 @@ const ChatComponent = () => {
   const handleTemplateContentChange = (content) => {
     setTemplateCont(content);
     setNewMessage(content)
+    setTimeout(() => {
+      if (textareaRef.current) {
+          textareaRef.current.style.height = "auto"; // Reset height
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Expand based on content
+      }
+  }, 0);
   };
 
   const handleMediaComponent = () => {
@@ -593,6 +641,11 @@ const ChatComponent = () => {
         </div>
       </Box>
       <Box className="chatContainer" ref={chatContainerRef}>
+        {loadingMessages && (
+          <div className="topLoaderContainer">
+          <img src={loaderGIF} alt="Loading..." className="topLoader" />
+        </div>
+        )}
         {messages.length > 0 ? (
           messages.map((message, index) => {
             const isSent = message.from === twiliophone;
@@ -668,34 +721,38 @@ const ChatComponent = () => {
         </button>
         {
           mediaComponent && (
-            <MediaComponent className="mediaComponent" mediaComponent={mediaComponent} attachment={attachment} attachmentUrl={attachmentUrl} setAttachment={setAttachment} setAttachmentUrl={setAttachmentUrl}/>
+            <MediaComponent className="mediaComponent" authToken={authToken} accountSid={accountSid} mediaComponent={mediaComponent} attachment={attachment} attachmentUrl={attachmentUrl} setAttachment={setAttachment} setAttachmentUrl={setAttachmentUrl}/>
           )
         } */}
-        
-        
-        <div className="textarea-container">
-  <textarea
-    className={`message-input ${showPopUp ? "exceed-warning" : ""}`}
-    value={newMessage}
-    onChange={handleInputChange}
-    placeholder="Type your message here..."
-    style={{
-      height: newMessage ? `${textareaHeight}px` : "30px",
-      maxHeight: "90px", // Maximum height
-      overflowY: textareaHeight >= 90 ? "scroll" : "hidden", // Scroll only when maxHeight is reached
-      resize: "none", // Disable manual resizing
-      bottom: "0", // Stick to the bottom initially
-      transition: "transform 0.2s ease",
-    }}
-  />
-  {showPopUp && (
-    <div className="textarea-warning">
-      Character limit exceeded, message will be sent in parts.
+
+<div className="textarea-container">
+      <textarea
+        ref={textareaRef}
+        rows={1} // Default row height
+        className={`message-input ${showPopUp ? "exceed-warning" : ""}`}
+        value={newMessage}
+        onChange={handleInputChange}
+        placeholder="Type your message here..."
+        style={{
+          width: "44rem",
+          minHeight: "30px",
+          maxHeight: "90px", // Limit max height
+          fontSize: "13px",
+          borderRadius: "10px",
+          outline: "none",
+          bottom: '0px',
+          position: 'relative',
+          resize: "none",
+          overflow: "hidden scroll", // Prevent scrollbars
+          transition: "height 0.2s ease",
+        }}
+      />
+      {showPopUp && (
+        <div className="textarea-warning">
+          Character limit exceeded, message will be sent in parts.
+        </div>
+      )}
     </div>
-  )}
-</div>
-        {
-          !isCountdownActive ? (
         <button
           className={`button ${buttonState === "loading" ? "animate" : ""} ${
             buttonState === "success" ? "animate success" : ""
@@ -705,13 +762,6 @@ const ChatComponent = () => {
         >
           <IoIosSend />
         </button>
-          ) : (
-            <div className="button">
-              <div className="timer">{timer}</div>
-              <button className="cancelSend" onClick={cancelSendMessage}><RxCross1 /></button>
-            </div>
-          )
-        }
       </Box>
       <ToastContainer 
         position="top-center"

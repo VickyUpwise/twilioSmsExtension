@@ -7,7 +7,7 @@ import { RxCross2 } from "react-icons/rx";
 import { IoIosArrowBack } from "react-icons/io";
 import { MdOutlineDone } from "react-icons/md";
 
-const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowTemplateComponent, setNewMessage}) => {
+const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowTemplateComponent}) => {
   const [allTemplates, setAllTemplates] = useState([]); // List of templates
   const [currentPage, setCurrentPage] = useState(1); // Current page
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility
@@ -113,10 +113,6 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowT
     setShowTemplateComponent(false)
   }
 
-  const handleTemplateSelected = (message) => {
-    setNewMessage(message)
-  }
-
   return (
     <div className={modalVisible? 'modalContainer': 'templateContainer'}>
       {allTemplates.length === 0 ? (
@@ -162,7 +158,7 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowT
                 <div className="templateHeader">
                   <h5>{template.Name}</h5>
                   <div className="templateActions">
-                  <button onClick={() => handleTemplateSelected(template.twiliophonenumbervalidatorbyupro__SMS_Content)}>
+                  <button onClick={() => handleTemplateContentChange(template.twiliophonenumbervalidatorbyupro__SMS_Content)}>
                   <MdOutlineDone />
                     </button>
                     <button onClick={() => handleEditClick(template)}>

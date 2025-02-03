@@ -12,7 +12,7 @@ import errorImage from '../utility/404Error.jpeg'
 import { TbXboxX } from "react-icons/tb";
 import { SiFusionauth } from "react-icons/si";
 
-const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachment, setAttachmentUrl, }) => {
+const MediaComponent = ({ accountSid, authToken, mediaComponent, attachment, attachmentUrl, setAttachment, setAttachmentUrl, }) => {
   const [fileType, setFileType] = useState(null);
   const [showOptions, setShowOptions] = useState(true)
   const [showWebcam, setShowWebcam] = useState(false);
@@ -20,47 +20,93 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
   const [showIndicator, setShowIndicator] = useState(false)
   const [showError, setShowError] = useState(false);
   const [showLoader, setShowLoader] = useState(false)
-  const accessTokenRef = useRef("");
-  const clientIdRef = useRef("");
-  const clientSecretRef = useRef("");
-  const refreshTokenRef = useRef("");
+  // const accessTokenRef = useRef("");
+  // const clientIdRef = useRef("");
+  // const clientSecretRef = useRef("");
+  // const refreshTokenRef = useRef("");
   const parentIdRef = useRef("");
-  const REDIRECT_URI = "https://plugin-twiliophonenumbervalidatorbyupro.zohosandbox.com/crm/tab/Leads/";
+  // const REDIRECT_URI = "https://plugin-twiliophonenumbervalidatorbyupro.zohosandbox.com/crm/tab/Leads/";
 
   useEffect(() => {
-    console.log("useffect called")
     fetchZohoWorkDriveDetails();
   }, [mediaComponent]);
 
+  const connectorAuthorization = async () => {
+    try{
+      const connector_name = 'twiliophonenumbervalidatorbyupro.zohoworkdrive'
+      const response = await ZOHO.CRM.CONNECTOR.authorize(connector_name);
+      console.log('response of connector', response);
+    }
+    catch(error){
+      console.log('error in auth', error)
+    }
+  }
+
+  const getZohoWorkdriveDetails = async () => {
+    try {
+      // Step 1: Get User ID
+      const userResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getUserInfo", {});
+      console.log("User Info:", userResponse);
+      const userId = userResponse.data.id;
+
+      if (!userId) throw new Error("User ID not found");
+
+      // Step 2: Get Team Info using User ID
+      const teamResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getTeamInfo", { user_id: userId });
+      console.log("Team Info:", teamResponse);
+      const teamId = teamResponse.data.team_id;
+
+      if (!teamId) throw new Error("Team ID not found");
+
+      // Step 3: Get Team Member Info using Team ID
+      const teamMemberResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getTeamMemberInfo", { team_id: teamId });
+      console.log("Team Member Info:", teamMemberResponse);
+      const teamMemberId = teamMemberResponse.data.team_member_id;
+
+      if (!teamMemberId) throw new Error("Team Member ID not found");
+
+      // Step 4: Get Parent ID using Team Member ID
+      const parentResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getParentId", { team_member_id: teamMemberId });
+      console.log("Parent ID Info:", parentResponse);
+      const parentId = parentResponse.data.parent_id;
+
+      if (!parentId) throw new Error("Parent ID not found");
+
+      return parentId;
+  } catch (error) {
+      console.error("Error fetching Zoho WorkDrive data:", error);
+  }
+  }
+
   const fetchZohoWorkDriveDetails = async () => {
     try {
-      const clientId = await ZOHO.CRM.API.getOrgVariable(
-        "twiliophonenumbervalidatorbyupro__work_drive_clientId"
-      );
-      const clientSecret = await ZOHO.CRM.API.getOrgVariable(
-        "twiliophonenumbervalidatorbyupro__work_drive_client_secret"
-      );
-      const aToken = await ZOHO.CRM.API.getOrgVariable(
-        "twiliophonenumbervalidatorbyupro__work_drive_access_token"
-      );
-      const rToken = await ZOHO.CRM.API.getOrgVariable(
-        "twiliophonenumbervalidatorbyupro__work_drive_refresh_token"
-      );
+      // const clientId = await ZOHO.CRM.API.getOrgVariable(
+      //   "twiliophonenumbervalidatorbyupro__work_drive_clientId"
+      // );
+      // const clientSecret = await ZOHO.CRM.API.getOrgVariable(
+      //   "twiliophonenumbervalidatorbyupro__work_drive_client_secret"
+      // );
+      // const aToken = await ZOHO.CRM.API.getOrgVariable(
+      //   "twiliophonenumbervalidatorbyupro__work_drive_access_token"
+      // );
+      // const rToken = await ZOHO.CRM.API.getOrgVariable(
+      //   "twiliophonenumbervalidatorbyupro__work_drive_refresh_token"
+      // );
       const parent_i_d = await ZOHO.CRM.API.getOrgVariable(
         "twiliophonenumbervalidatorbyupro__parentId"
       );
   
-      clientIdRef.current = clientId.Success.Content || "";
-      clientSecretRef.current = clientSecret.Success.Content || "";
-      accessTokenRef.current = aToken.Success.Content || "";
-      refreshTokenRef.current = rToken.Success.Content || "";
+      // clientIdRef.current = clientId.Success.Content || "";
+      // clientSecretRef.current = clientSecret.Success.Content || "";
+      // accessTokenRef.current = aToken.Success.Content || "";
+      // refreshTokenRef.current = rToken.Success.Content || "";
       parentIdRef.current = parent_i_d.Success.Content || "";
   
       console.log("Fetched details:", {
-        clientId: clientIdRef.current,
-        clientSecret: clientSecretRef.current,
-        accessToken: accessTokenRef.current,
-        refreshToken: refreshTokenRef.current,
+        // clientId: clientIdRef.current,
+        // clientSecret: clientSecretRef.current,
+        // accessToken: accessTokenRef.current,
+        // refreshToken: refreshTokenRef.current,
         parentId: parentIdRef.current,
       });
     } catch (error) {
@@ -68,6 +114,65 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
       toast.error("Something went wrong. Please try again.");
     }
   };
+
+  const upoladFile = async (file) => {
+    try {
+      if (!file) {
+          console.error("No file selected for upload.");
+          return;
+      }
+
+      // Extract file properties
+      const fileName = file.name;
+      const fileType = file.type;
+
+      // Prepare request body
+      var data = {
+        "VARIABLES": {
+            "filename": encodeURIComponent(fileName), // URL-encoded filename
+            "parent_id": parentIdRef.current, // REQUIRED: Folder ID where the file will be stored
+            "override-name-exist": "false" // Optional: Set to "true" to overwrite
+        },
+        "CONTENT_TYPE": "multipart",
+        "PARTS": [
+            {
+                "headers": {
+                    "Content-Type": "application/json"
+                },
+                "content": {
+                    "filename": encodeURIComponent(fileName),
+                    "parent_id": parentIdRef.current,
+                    "override-name-exist": "false"
+                }
+            },
+            {
+                "headers": {
+                    "Content-Disposition": `file; name="content"; filename="${fileName}"`
+                },
+                "content": "__FILE__"
+            }
+        ],
+        "FILE": {
+            "fileParam": "content",
+            "file": file
+        }
+    };
+
+      console.log("Uploading file:", data);
+
+      // Call Zoho API Connector
+      const response = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.uploadfile", data);
+      
+      console.log("Upload Response:", response);
+      return response;
+  } catch (error) {
+    if(error.code === '403' && error.message === 'Authorization Exception'){
+      const responeAuth = await connectorAuthorization()
+      console.log('reponseAuth', responeAuth)
+    }
+      console.error("Error uploading file:", error);
+  }
+  }
 
   // Step 1: Redirect user to Zoho OAuth Authorization Page
   // const initiateZohoAuth = () => {
@@ -136,64 +241,103 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
 
   // Step 3: Upload File to Zoho WorkDrive
 
-  const uploadFileToZoho = async (file , token = accessTokenRef.current) => {
-    const formData = new FormData();
-  formData.append("content", file);
-  formData.append("parent_id", parentIdRef.current);
+  // const uploadFileToZoho = async (file , token = accessTokenRef.current) => {
+  //   const formData = new FormData();
+  // formData.append("content", file);
+  // formData.append("parent_id", parentIdRef.current);
 
-  console.log("Access token being used:", token);
+  // console.log("Access token being used:", token);
 
 
-  try {
-    const response = await axios.post(
-      "https://127.0.0.1:5000/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Zoho-oauthtoken ${token}`,
-          parentId: parentIdRef.current,
-        },
-      }
-    );
+  // try {
+  //   const response = await axios.post(
+  //     "https://127.0.0.1:5000/upload",
+  //     formData,
+  //     {
+  //       headers: {
+  //         "Content-Type": "multipart/form-data",
+  //         Authorization: `Zoho-oauthtoken ${token}`,
+  //         parentId: parentIdRef.current,
+  //       },
+  //     }
+  //   );
 
-    if (parentIdRef.current !== response.data.parentID) {
-      const data = {
-        apiname: "twiliophonenumbervalidatorbyupro__parentId",
-        value: response.data.parentID,
-      };
-      parentIdRef.current = response.data.parentID;
-      await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", data);
-    }
+  //   if (parentIdRef.current !== response.data.parentID) {
+  //     const data = {
+  //       apiname: "twiliophonenumbervalidatorbyupro__parentId",
+  //       value: response.data.parentID,
+  //     };
+  //     parentIdRef.current = response.data.parentID;
+  //     await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", data);
+  //   }
 
-    setAttachmentUrl(response.data.permalink);
-    setFileType(file.name.split(".").pop());
-    } catch (error) {
-      if (
-        error.response?.status === 500 &&
-        error.response?.data?.message === "Invalid OAuth token."
-      ) {
-        const newAccessToken = await refreshAccessToken();
-        uploadFileToZoho(file , newAccessToken);
-      } else if (
-        error.response?.status === 400 &&
-        error.response?.data?.message === "Parameter length more than permitted"
-      ) {
-        setShowError(true)
-        toast.error("File name is too long. Please rename the file.");
-      } else if (
-        error.response?.status === 400 &&
-        error.response?.data?.error === "No file uploaded"
-      ) {
-        setShowError(true)
-        toast.error("Something went wrong. Please refresh the page.");
-      } else {
-        console.error("File upload failed:", error.response?.data || error);
-        setShowError(true)
-        toast.error("Failed to upload file. Please try again.");
-      }
-    }
-  };
+  //   setAttachmentUrl(response.data.permalink);
+  //   setFileType(file.name.split(".").pop());
+  //   } catch (error) {
+  //     if (
+  //       error.response?.status === 500 &&
+  //       error.response?.data?.message === "Invalid OAuth token."
+  //     ) {
+  //       const newAccessToken = await refreshAccessToken();
+  //       uploadFileToZoho(file , newAccessToken);
+  //     } else if (
+  //       error.response?.status === 400 &&
+  //       error.response?.data?.message === "Parameter length more than permitted"
+  //     ) {
+  //       setShowError(true)
+  //       toast.error("File name is too long. Please rename the file.");
+  //     } else if (
+  //       error.response?.status === 400 &&
+  //       error.response?.data?.error === "No file uploaded"
+  //     ) {
+  //       setShowError(true)
+  //       toast.error("Something went wrong. Please refresh the page.");
+  //     } else {
+  //       console.error("File upload failed:", error.response?.data || error);
+  //       setShowError(true)
+  //       toast.error("Failed to upload file. Please try again.");
+  //     }
+  //   }
+  // };
+  // const convertToBase64 = (file) => {
+  //   return new Promise((resolve, reject) => {
+  //     const reader = new FileReader();
+  //     reader.readAsDataURL(file);
+  //     reader.onload = () => resolve(reader.result.split(",")[1]); // Extract Base64
+  //     reader.onerror = (error) => reject(error);
+  //   });
+  // };
+
+  // const handleUpload = async (file) => {
+  //   if (!file) {
+  //     alert("Please select a file!");
+  //     return;
+  //   }
+
+  //   const formData = new FormData();
+  //   formData.append("file", file);
+  //   formData.append("accountSid", accountSid);
+  //   formData.append("authToken", authToken);
+
+  //   try {
+  //     const response = await fetch("https://127.0.0.1:5000/upload", {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     const data = await response.json();
+
+  //     if (response.ok) {
+  //       setAttachmentUrl(data.url); // Save the public URL for Twilio MediaUrl
+  //       alert("File uploaded successfully!");
+  //     } else {
+  //       alert("File upload failed. Please try again.");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error uploading file:", error);
+  //     alert("File upload failed.");
+  //   }
+  // };
 
   const handleFileSelection = async (file) => {
     if (file.size > 250 * 1024 * 1024) {
@@ -204,7 +348,9 @@ const MediaComponent = ({ mediaComponent, attachment, attachmentUrl, setAttachme
     }
     setAttachment(file);
     setShowOptions(false);// Hide the options card 
-    uploadFileToZoho(file);
+    // uploadFileToZoho(file);
+    upoladFile(file)
+    // handleUpload(file)
     // if(!accessTokenRef.current && !refreshTokenRef.current){
     //   toast.error('Please Authorize Zoho WorkDrive.')
     //   return;
