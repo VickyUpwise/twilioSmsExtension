@@ -1,27 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import "./settings.scss";
 import { toast, ToastContainer } from "react-toastify";
 import CircularProgress from '@mui/material/CircularProgress';
 import "react-toastify/dist/ReactToastify.css";
 import { motion } from "framer-motion";
-import {
-  Table,
-  TableBody,
-  TableCell,
+import { Table, TableBody, TableCell,
   TableContainer,
   TableHead,
   TableRow,
   IconButton,
   TablePagination,
   Switch,
-  Box, styled, TextField
+  Box, styled, TextField, Typography
 } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+
 import Tooltip from '@mui/material/Tooltip'
 import { IoIosAddCircleOutline } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
 import neo1 from '../utility/C-HM Conseil .jpeg'
 import neo2 from '../utility/C-HM Conseil - Awwwards Honorable Mention.jpeg'
 import { MdOutlineDone } from "react-icons/md";
+import { FiAlertTriangle } from "react-icons/fi";
 
 const CustomTextField = styled(TextField)({
   width: '100%',
@@ -105,16 +105,23 @@ const Settings = () => {
   const [twilioSID, setTwilioSID] = useState("");
   const [twiliotoken, setTwilioToken] = useState("");
   const [twilioPhoneNumbers, setTwilioPhoneNumbers] = useState([]);
+  const newTwilioPhoneNumbersRef = useRef([])
   const [currentTwilioNumber, setCurrentTwilioNumber] = useState("");
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(3);
   const [isEditing, setIsEditing] = useState(false);
-  const [newTwilioField, setNewTwilioField] = useState({name: '', number: ''})
+  const [newTwilioField, setNewTwilioField] = useState({name: '', number: '', status: ''})
   const [showLoader, setShowLoader] = useState(false);
   const [invaildSid, setInvalidSid] = useState(false);
   const [invalidToken, setInvalidToken] = useState(false);
   const [fetchNumber, setFetchNumber] = useState([])
+  const [openConfirmModal, setOpenConfirmModal] = useState(false);
+  const [tempSid, setTempSid] = useState(""); // Temporary SID before confirmation
+  const [tempToken, setTempToken] = useState(""); // Temporary Token before confirmation
+  const [initialSid, setInitialSid] = useState(""); // Original SID
+  const [initialToken, setInitialToken] = useState(""); // Original Token
+  const [loading , setShowLoading] = useState(false)
 
   useEffect(() => {
     ZOHO.embeddedApp.on("PageLoad", fetchTwilioCredentials);
@@ -123,21 +130,27 @@ const Settings = () => {
 
   const fetchTwilioCredentials = async () => {
     try {
+      setShowLoading(true)
       const twilioSID = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_SID");
       const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
       const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
       const twilioPhoneNumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
       
       // Parse the responses if necessary (assuming Success.Content contains the value)
-      const sidContent = twilioSID.Success.Content;
-      const tokenContent = twilioToken.Success.Content;
-      const numberContent = currentTwilioNumber.Success.Content;
-      const phoneNumbers = JSON.parse(twilioPhoneNumbers.Success.Content);
-  
+      const sidContent = twilioSID.Success.Content || "";
+      const tokenContent = twilioToken.Success.Content || "";
+      const numberContent = currentTwilioNumber.Success.Content || "";
+      const phoneNumbers = JSON.parse(twilioPhoneNumbers.Success.Content) || [];
+console.log("Number: ", numberContent);
+console.log("Phone Numbers: ", phoneNumbers);
+
       setTwilioSID(sidContent)
       setTwilioToken(tokenContent)
       setCurrentTwilioNumber(numberContent)
+        setShowLoading(false)
       setTwilioPhoneNumbers(phoneNumbers)
+      setInitialSid(sidContent); // Store original SID
+      setInitialToken(tokenContent); // Store original Token
     } catch (error) {
       console.error("Error:", error);
     }
@@ -154,13 +167,25 @@ const Settings = () => {
               "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
             }
           });
-      
+
           if (response.ok) {
             const data = await response.json();
-            console.log('twilio phone number',data)
-            const phoneNumbers = data.incoming_phone_numbers.map(num => num.phone_number);
-            setFetchNumber(phoneNumbers)
-            return { success: true, numbers: data.incoming_phone_numbers };
+            const fetchedNumbers = data.incoming_phone_numbers.map(num => num.phone_number);
+  
+            // Map over existing stored numbers to check status
+            const updatedStoredNumbers = twilioPhoneNumbers.map(storedNum => ({
+              ...storedNum,
+              status: fetchedNumbers.includes(storedNum.number) ? "active" : "inactive",
+            }));
+  
+            // Set the updated stored numbers with statuses
+            setTwilioPhoneNumbers(updatedStoredNumbers);
+  
+            // Filter out numbers that are already in the stored list
+            const uniqueNumbers = fetchedNumbers.filter(num => !twilioPhoneNumbers.some(tw => tw.number === num));
+            
+            // Add "Selected Option" as default
+            setFetchNumber(["Selected Option", ...uniqueNumbers]);
           } else {
             const errorData = await response.json();
             console.error("❌ Failed to fetch Twilio phone numbers:", errorData);
@@ -171,29 +196,24 @@ const Settings = () => {
           return { success: false, error };
         }
       };
-      if(twilioSID && twiliotoken){
+      if(twilioSID, twiliotoken, isEditing){
       fetchTwilioPhoneNumbers(twilioSID, twiliotoken);
       }
-  },[twilioSID, twiliotoken])
+  },[twilioSID, twiliotoken, isEditing])
   
   const verifyTwilioCredentials = async (accountSid, authToken) => {
+    if (!accountSid || !authToken) {
+      return toast.error("Missing Twilio SID or Auth Token");
+    }
     try {
-      const response = await fetch("https://127.0.0.1:5000/verify-twilio", {
-        method: "POST",
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json"
+          "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
         },
-        body: JSON.stringify({ accountSid, authToken })
       });
-  
-      const data = await response.json();
-  
-      if (data.valid) {
-        console.log("✅ Twilio Credentials Verified Successfully:", data);
-        return { valid: true, data };
-      } else {
-        console.error("❌ Invalid Twilio Credentials:", data.error);
-        return { valid: false, error: data.error };
+      if(response.ok){
+        return { valid: true };
       }
     } catch (error) {
       console.error("⚠️ Error Verifying Twilio Credentials:", error);
@@ -219,18 +239,16 @@ const Settings = () => {
       } 
     }
     else {
-      toast.error("Twilio Credentials Verification Failed.");
+      toast.error("Invalid Twilio Credentials. Please check your credentials.");
     }
     
     return; // **🚫 Stop execution if verification fails**
   }
-  setInvalidSid(false)
-  setInvalidToken(false)
     const data = [
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_SID", value: twilioSID },
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_Token", value: twiliotoken },
       { apiname: "twiliophonenumbervalidatorbyupro__Phone_Numbers", value: twilioPhoneNumbers },
-      { apiname: "twiliophonenumbervalidatorbyupro__Current_Twilio_Number", value: currentTwilioNumber }
+      { apiname: "twiliophonenumbervalidatorbyupro__Current_Twilio_Number", value: currentTwilioNumber}
     ];
   
     try {
@@ -243,13 +261,12 @@ const Settings = () => {
         
       }
       toast.success('Twilio Credintials saved sucessfully.')
+      fetchTwilioCredentials()
     } catch (error) {
       console.log("error", error);
       toast.error('Failed to save credinitals. Please try again later.')
     }
   };
-
-  // Handler to add a new phone number
 
   const handleTwilioSID = (sid) => {
     setTwilioSID(sid);
@@ -300,8 +317,16 @@ const Settings = () => {
   };
 
   const handleAddRow = () => {
-    const newRow = { friendlyName: newTwilioField.name, number: newTwilioField.number };
-    setTwilioPhoneNumbers([newRow, ...twilioPhoneNumbers]);
+    const newRow = { friendlyName: newTwilioField.name, number: newTwilioField.number , status: "active"};
+    if(twilioSID !== initialSid || twiliotoken !== initialToken){
+      setTwilioPhoneNumbers([]);
+      newTwilioPhoneNumbersRef.current = [newRow, ...(newTwilioPhoneNumbersRef.current || [])];
+      setTwilioPhoneNumbers(newTwilioPhoneNumbersRef.current)
+      setCurrentTwilioNumber('')
+    }
+    else{
+      setTwilioPhoneNumbers([newRow, ...twilioPhoneNumbers]);
+    }
   };
 
   const handleChangePage = (event, newPage) => {
@@ -327,94 +352,125 @@ const Settings = () => {
     setNewTwilioField({name:'', number:''})
     setIsEditing(false)
   }
+
+  const handleSaveClick = () => {
+    // If Twilio SID and Token are being set for the first time, directly save without showing the confirmation modal
+    if (!initialSid && !initialToken) {
+      saveCustomPropertiesOfTwilio();
+      return;
+    }
+  
+    // If the user is changing existing credentials, show the confirmation dialog
+    if (twilioSID !== initialSid || twiliotoken !== initialToken) {
+      setTempSid(twilioSID);
+      setTempToken(twiliotoken);
+      setOpenConfirmModal(true);
+    } else {
+      saveCustomPropertiesOfTwilio();
+    }
+  };
+  
+  
+  const confirmSave = () => {
+    setOpenConfirmModal(false);
+    saveCustomPropertiesOfTwilio(); // Proceed with saving
+  };
+  
   return (
     <Box className="settingsContainer">
-      <div className='neomorphic-container-2'>
+      {/* <div className='neomorphic-container-2'>
       <img src={neo2} alt="neo-2" />
       </div>
       <div className='neomorphic-container-1'>
       <img src={neo1} alt="neo-1" />
-      </div>
+      </div> */}
       <Box className='innerContainer'>
       <div className='inputContainer'>
-        <CustomTextField id="outlined-basic" label="Account SID" variant="outlined" sx={{border: invaildSid ? '1px solid red' : ""}} value={twilioSID} onChange={(e) => handleTwilioSID(e.target.value)}/>
-        <CustomTextField id="outlined-basic" label="Account Token" type="password" variant="outlined" sx={{boder: invalidToken ? '1px solid red' : ""}} value={twiliotoken} onChange={(e) => handleTwilioToken(e.target.value)}/>
+        <CustomTextField id="outlined-basic" label="Account SID" variant="outlined" sx={{border: invaildSid ? '1px solid red' : "none"}} value={twilioSID} onChange={(e) => handleTwilioSID(e.target.value)}/>
+        <CustomTextField id="outlined-basic" label="Account Token" type="password" variant="outlined" sx={{boder: invalidToken ? '1px solid red' : "none"}} value={twiliotoken} onChange={(e) => handleTwilioToken(e.target.value)}/>
       </div>
         <div className='neomorphic-table'>
-      <NeomorphicTableContainer>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <CustomTableCell sx={{fontWeight: 'bold'}}>Friendly Name</CustomTableCell>
-              <CustomTableCell sx={{fontWeight: 'bold'}}>Twilio Number</CustomTableCell>
-              <CustomTableCell align="center" sx={{fontWeight: 'bold'}}>Set as Default</CustomTableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-  {twilioPhoneNumbers
-    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-    .map((row, index) => (
-      <NeomorphicTableRow
-        key={index}
-        isSelected={row.number === currentTwilioNumber}
-      >
-        <CustomTableCell>
-          {row.friendlyName ? (
-            row.friendlyName
-          ) : (
-            <TextField
-  placeholder="Enter Friendly Name"
-  size="small"
-  value={row.friendlyName}
-  // onChange={(e) => {
-  //   const updatedRows = [...twilioPhoneNumbers];
-  //   updatedRows[index] = { ...row, friendlyName: e.target.value };
-  //   setTwilioPhoneNumbers(updatedRows);
-  // }}
-/>
-          )}
-        </CustomTableCell>
-        <CustomTableCell>
-          {row.number ? (
-            row.number
-          ) : (
-            <TextField
-              placeholder="Enter Number"
-              size="small"
-              value={row.number || ""}
-  // onChange={(e) => {
-  //   const updatedRows = [...twilioPhoneNumbers];
-  //   updatedRows[index] = { ...row, number: e.target.value };
-  //   setTwilioPhoneNumbers(updatedRows);
-  // }}
-            />
-          )}
-        </CustomTableCell>
-        <CustomTableCell align="center">
-          <Tooltip title='Set as default Number'>
-          <Switch
-            checked={row.number === currentTwilioNumber}
-            onChange={() => handleToggle(row)}
-          />
-          </Tooltip>
+        <NeomorphicTableContainer>
+  <Table>
+    <TableHead>
+      <TableRow>
+        <CustomTableCell sx={{ fontWeight: 'bold' }}>Friendly Name</CustomTableCell>
+        <CustomTableCell align="center" sx={{ fontWeight: 'bold' }}>Twilio Number</CustomTableCell>
+        <CustomTableCell align="center" sx={{ fontWeight: 'bold' }}>Set as Default</CustomTableCell>
+      </TableRow>
+    </TableHead>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(index);
-            }}
-            className="deleteButton"
-          >
-            <MdDelete />
-          </button>
-        </CustomTableCell>
-      </NeomorphicTableRow>
-    ))}
-</TableBody>
+    {loading ? 
+    <TableBody>
+    <TableRow>
+      <CustomTableCell colSpan={3} align="center">
+        <div style={{ justifyContent: "center",
+display: "flex", height: "4rem",
+padding: "20px",
+alignItems: "center",
+fontSize: "14px"}}>
+          <CircularProgress size={17} /> 
+        </div>
+      </CustomTableCell>
+    </TableRow>
+  </TableBody>
+  : twilioPhoneNumbers.length === 0 ? (
+      // ✅ Show this container when no Twilio numbers are available
+      <TableBody>
+        <TableRow>
+          <CustomTableCell colSpan={3} align="center">
+            <div style={{ justifyContent: "center",
+    display: "flex", height: "4rem",
+    padding: "20px",
+    alignItems: "center",
+    fontSize: "14px",
+    color: "rgb(136, 136, 136)"}}>
+              Its empty here. Please add a number.
+            </div>
+          </CustomTableCell>
+        </TableRow>
+      </TableBody>
+    ) : (
+      // ✅ Show the actual table when numbers exist
+      <TableBody>
+      {twilioPhoneNumbers
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+          .map((row, index) => (
+            <NeomorphicTableRow key={index} isSelected={row.number === currentTwilioNumber}>
+              <CustomTableCell>
+                {row.friendlyName}
+              </CustomTableCell>
+              <CustomTableCell>
+                <div className="tableCell">
+                {row.number}
+                <span style={{color: row.status === "inactive" ? "red" : "green"}}>{row.status === "inactive" ? "Inactive" : "Active"}</span>
+                </div>
+              </CustomTableCell>
+              <CustomTableCell align="center">
+                <Tooltip title='Set as default Number'>
+                  <Switch
+                    checked={row.number === currentTwilioNumber}
+                    onChange={() => handleToggle(row)}
+                  />
+                </Tooltip>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(index);
+                  }}
+                  className="deleteButton"
+                >
+                  <MdDelete />
+                </button>
+              </CustomTableCell>
+            </NeomorphicTableRow>
+          ))}
+      </TableBody>
+    )}
+  </Table>
+</NeomorphicTableContainer>
 
-        </Table>
-      </NeomorphicTableContainer>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0px", width:'100%'}}>
         <TablePagination
           rowsPerPageOptions={[4]}
           component="div"
@@ -426,17 +482,12 @@ const Settings = () => {
           sx={{overflow:'hidden'
           }}
         />
-         <Tooltip title={isEditing ? "Cancel adding": "Add new number"}>
-        <AddButton onClick={() => setIsEditing(!isEditing)}>
-          {!isEditing ? "Add" : "Cancel"}
-        </AddButton>
-         </Tooltip>
         {
           isEditing && (
             <motion.div
   className="newEditField"
-  initial={{ x: -300, opacity: 0 }}
-  animate={{ x: isEditing ? 0 : -300, opacity: isEditing ? 1 : 0 }}
+  initial={{opacity: 0 }}
+  animate={{opacity: isEditing ? 1 : 0 }}
   transition={{ duration: 1, ease: "easeInOut" }}
 >
   <input 
@@ -465,30 +516,81 @@ const Settings = () => {
     </button>
   </Tooltip>
 </motion.div>
-            // <div className="newEditField">
-            //   <input placeholder="Friendly Name" type="text" name='name' value={newTwilioField.name} onChange={handleInputChange}/>
-            //   <input placeholder="Twilio Number"type="text" name='number' value={newTwilioField.number} onChange={handleInputChange}/>
-            //   <Tooltip title="Save">
-            //   <button onClick={handleSaveFeild}><MdOutlineDone /></button>
-            //   </Tooltip>
-            // </div>
           )
         }
+         <Tooltip title={isEditing ? "Cancel adding": "Add new number"}>
+        <AddButton onClick={() => setIsEditing(!isEditing)}>
+          {!isEditing ? "Add" : "Cancel"}
+        </AddButton>
+         </Tooltip>
       </div>
       <div className='saveButton'>
-        <button onClick={saveCustomPropertiesOfTwilio}>
+        <button onClick={handleSaveClick}>
           {
             showLoader ? <CircularProgress size={12}/> : 'Save'
           }
         </button>
       </div>
+      <Dialog sx={{
+        "& .MuiDialog-paper": {
+          overflow: "visible", // Ensure overflow is visible
+          borderRadius: "12px",
+        }
+      }} open={openConfirmModal} onClose={() => setOpenConfirmModal(false)}>
+
+      <Box sx={{ textAlign: "center", padding: "5px" ,position: "relative" }}>
+        {/* Trash Icon with Red Background */}
+        <Box
+          sx={{
+            width: 60,
+            height: 60,
+            backgroundColor: "#ff4d4d",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "auto",
+            marginBottom: "30px",
+            position: "absolute",
+            top: "-30px",
+            left: "50%",
+            transform: "translateX(-50%)",
+          }}
+        >
+          <FiAlertTriangle size={32} color="white" />
+        </Box>
+        <DialogContent sx={{
+        "& .MuiDialogContent-root": {
+          marginTop: '10px'
+        }
+      }}>
+          <Typography sx={{ fontSize: "16px", fontWeight: "500", textAlign: "center", marginBottom: "10px" }}>
+            Changing the <strong>Twilio Credentials</strong>
+          </Typography>
+            <p className="modalPara">Messages associated with your  <strong>previous Twilio account will no longer be displayed</strong> in the CRM. All configured numbers will reset.</p>
+          <Typography sx={{ fontSize: "14px", fontWeight: "500", textAlign: "center", color: "#ff4d4d", marginTop: "15px" }}>
+            Please update the settings to continue using our QuickSend extension.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: "center", gap: "10px"}}>
+          <Button onClick={() => setOpenConfirmModal(false)} variant="outlined" sx={{ borderColor: "#ccc", color: "#333", width: "120px" }}>
+            Cancel
+          </Button>
+          <Button onClick={confirmSave} variant="contained" sx={{ backgroundColor: "#ff4d4d", color: "white", width: "160px" }}>
+            Proceed
+          </Button>
+        </DialogActions>
+      </Box>
+</Dialog>
 
     </div>
       </Box>
-      <div className='neomorphic-text'>
-        <span>TWILIO</span>
-        <div className='neomorphic-container-4'></div>
-      </div>
+      {/* <div className='neomorphic-text'>
+        <div className='neomorphic-container-4'>
+        <span>QuickSend</span>
+        </div>
+      </div> */}
       <ToastContainer/>
     </Box>
   );

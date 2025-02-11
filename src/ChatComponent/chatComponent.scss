@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Playwrite+GB+J:ital,wght@0,100..400;1,100..400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Courgette&display=swap');
 .twilioChatContainer{
     display: flex;
     flex-direction: column;
@@ -6,6 +7,25 @@
     justify-content: center;
     padding: 5px;
     background-color: white;
+    .missingCredientialContainer{
+      display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 98vh;
+    svg{
+      font-size: 7rem;
+    color: red;
+    box-shadow: inset -1px -1px 1px #d3d3d3, inset 4px 4px 4px #f7f1f1, 0px 0px 5px #c4c4c4;
+    border-radius: 50%;
+    }
+    p{
+      margin: 10px 0px 0px;
+    font-size: 23px;
+    font-weight: 100;
+    }
+  }
 
     .chatHeader{
       display: flex;
@@ -70,6 +90,20 @@
         padding: 10px;
         scrollbar-width: none;
         width: -webkit-fill-available;
+        .endOfChatContainer {
+          color: #0f5ee7;
+    font-size: 14px;
+    font-family: "Courgette", serif;
+    font-weight: 700;
+    margin: 3px 0;
+    padding: 0px 0;
+    text-align: center;
+    word-spacing: 5px;
+    p{
+      margin: 0;
+    }
+        }
+        
         .topLoaderContainer{
           width: 100%;
     display: flex;
@@ -101,6 +135,15 @@
           padding: 10px;
           border-radius: 12px;
           box-shadow: -4px 4px 10px #afb4ba;
+
+          .leftErrorIcon {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: red; // Set red color for failed messages
+            font-size: 20px;
+            cursor: pointer;
+          }
 
           .messageContent {
             position: relative;
@@ -141,6 +184,11 @@
           background: #3355FF;
           border-radius: 12px 12px 0px 12px;
           color: #fff;
+
+          .leftErrorIcon {
+            left: auto;
+            right: calc(100% + 30px); // Moves left icon outside the message bubble
+          }
         }
 
         .received {

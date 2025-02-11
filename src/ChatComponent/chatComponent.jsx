@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Box, Select, MenuItem} from "@mui/material";
+import { Box, Select, MenuItem, Tooltip} from "@mui/material";
 import { FiAlertCircle } from "react-icons/fi";
 import { IoIosSend, IoMdPerson } from "react-icons/io";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
@@ -20,6 +20,9 @@ import MediaComponent from "../MediaComponent/mediaComponent";
 import eclipse from '../utility/reload.gif'
 import Divider from '@mui/material/Divider';
 import loaderGIF from '../utility/Loader.gif'
+import { color } from "framer-motion";
+import { RxQuestionMarkCircled } from "react-icons/rx";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 
 const ChatComponent = () => {
   const [env, setEnv] = useState({
@@ -51,6 +54,9 @@ const ChatComponent = () => {
   const textareaRef = useRef(null);
   const [loadingMessages, setLoadingMessages] = useState(false); // Prevent multiple fetch calls
   const nextPageTokenRef = useRef(null);
+  const [phoneValid, setPhoneValid] = useState(null);
+const [mobileValid, setMobileValid] = useState(null);
+const [showNoNumberModal, setShowNoNumberModal] = useState(false);
 
   //fetch the entity data and Twilio Account Details on pageload
   useEffect(() => {
@@ -70,7 +76,7 @@ const ChatComponent = () => {
     if (env.entity && env.entityId) {
       fetchClientDetails();
     }
-  }, [env.entity, env.entityId]);
+  }, [env.entity, env.entityId, accountSid, authToken]);
 
   // fetch chat history
   useEffect(() => {
@@ -98,7 +104,6 @@ useEffect(() => {
               fetchPreviousMessagesFromTwilio(true);
               currentCount++;
               setRenderCount(currentCount);
-              toast(`refreshing the feed for ${currentCount} time.`);
               intervalId = setTimeout(executeFetch, intervalTimes[currentCount]);
           }
       };
@@ -130,107 +135,184 @@ useEffect(() => {
 }, [twiliophone, defaultNumber]);
 
   useEffect(() => {
-    if (newMessage.length > 1600) {
-      setShowPopUp(true); // Explicitly show the popup
+    if(accountSid){
+      if (newMessage.length > 1600) {
+        setShowPopUp(true); // Explicitly show the popup
+      }
+      else(
+        setShowPopUp(false)
+      )
+      if (!newMessage) {
+        textareaRef.current.style.height = "30px"; // Reset height after sending message
     }
-    else(
-      setShowPopUp(false)
-    )
-    if (!newMessage) {
-      textareaRef.current.style.height = "30px"; // Reset height after sending message
-  }
+    }
   }, [newMessage])
 
-  // fetching twilio account details.
-  const fetchAccountDetails = async () => {
+  // Function to check if the Twilio number is active
+  const checkTwilioNumberStatus = async (number, sid, token) => {
     try {
-      const twilioSID = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_SID");
-      const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
-      const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
-      const twiliophonenumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
+      if (!number || !sid || !token) {
+        return { status: false, error: "Missing number, SID, or Auth Token" };
+      }
       
-
-      const sidContent = twilioSID.Success.Content;
-      const tokenContent = twilioToken.Success.Content;
-      const numberContent = currentTwilioNumber.Success.Content;
-      const numberlist = JSON.parse(twiliophonenumbers.Success.Content);
-      
-      if (sidContent === "") {
-        setAccountSid("");
-        toast.error("Account SID not present. Please refer to settings page.");
-      } else {
-        setAccountSid(sidContent);
-      }
-
-      if (tokenContent === "") {
-        setAuthToken("");
-        toast.error(
-          "Account Token not present. Please refer to settings page."
-        );
-      } else {
-        setAuthToken(tokenContent);
-      }
-
-      if (numberContent === "") {
-        setTwilioPhone("");
-        toast.error(
-          "Please Choose a number from the number list."
-        );
-      } else {
-        setTwilioPhone(numberContent);
-      }
-
-
-      if(twiliophonenumbers === ''){
-        setTwilioPhoneNumbers('')
-        toast.error(
-          "Twilio Phone number not present. Please refer to settings page."
-        );
-      }
-      else{
-        setTwilioPhoneNumbers(numberlist)
-      }
-
-      
+      const response = await axios.get(
+        `https://lookups.twilio.com/v1/PhoneNumbers/${encodeURIComponent(number)}?Type=carrier`,
+        {
+          auth: { username: sid, password: token },
+        }
+      );
+  
+      console.log("Twilio Number Status:", response.data);
+  
+      // If carrier data exists, the number is active
+      return { status: response.data.carrier ? true : false, error: null };
+  
     } catch (error) {
-      console.error("Error getting Account Details", error);
-      toast.error("Something went wrong. Please try again");
+      console.error("Error checking Twilio number status:", error);
+  
+      if (error.response) {
+        const errorCode = error.response.status;
+        const errorMessage = error.response.data.message || "Unknown error";
+  
+        switch (errorCode) {
+          case 21608:
+            return { status: false, error: "Permission denied: SMS is not enabled for this region" };
+          case 21606:
+            return { status: false, error: "Invalid 'From' number: Not a valid SMS-capable Twilio number" };
+          case 20003:
+            return { status: false, error: "Authentication Error: Twilio credentials may be incorrect or the account is suspended" };
+          case 30007:
+            return { status: false, error: "Message blocked: Carrier filtering in place" };
+          case 30005:
+            return { status: false, error: "Invalid or released Twilio number: No longer exists" };
+          default:
+            return { status: false, error: `Twilio API error: ${errorMessage}` };
+        }
+      }
+  
+      return { status: false, error: "Network error or unknown Twilio issue" };
     }
   };
+  
+
+// Fetch Twilio credentials and check if number is active
+// Fetch Twilio credentials and check if number is active
+const fetchAccountDetails = async () => {
+  try {
+    const twilioSID = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_SID");
+    const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
+    const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
+    const twilioPhoneNumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
+
+    const sidContent = twilioSID.Success.Content;
+    const tokenContent = twilioToken.Success.Content;
+    const numberContent = currentTwilioNumber.Success.Content;
+    const numberList = JSON.parse(twilioPhoneNumbers.Success.Content);
+
+    setAccountSid(sidContent || "");
+    setAuthToken(tokenContent || "");
+    setTwilioPhone(numberContent || "");
+    setTwilioPhoneNumbers(numberList || []);
+
+    if (!numberContent){
+      setShowNoNumberModal(true); // Show modal when no number is selected
+      // setTimeout(() => {
+      //   setShowNoNumberModal(false);
+      // }, 5000);
+    }
+
+    // Validate Twilio number status
+    if (numberContent) {
+      const { status, error } = await checkTwilioNumberStatus(numberContent, sidContent, tokenContent); // Extract `status` and `error`
+
+      if (!status) {
+        toast.error(`${error}`);
+        setTwilioPhone(""); // Reset inactive number
+      }
+    }
+
+  } catch (error) {
+    console.error("Error getting Account Details", error);
+    toast.error(" Failed to fetch Twilio credentials.");
+  }
+};
+
 
   //Fetching the Record of Individual from ZOHO
   const fetchClientDetails = async () => {
     try {
-      const recordData = await ZOHO.CRM.API.getRecord({
-        Entity: env.entity,
-        RecordID: env.entityId,
-      });
-      const entityData = recordData.data[0];
-      setEnv((prevEnv) => ({
-        ...prevEnv,
-        full_name: entityData.Full_Name,
-        phone: entityData.Phone || '',
-        mobile: entityData.Mobile || '',
-      }));
-      setDefaultNumber(entityData.Mobile || '');
-    } catch (error) {
-      console.log("error", error);
-    }
-  };
+        const recordData = await ZOHO.CRM.API.getRecord({
+            Entity: env.entity,
+            RecordID: env.entityId,
+        });
 
-const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
-  if (!twiliophone || !defaultNumber) {
-      toast.error("Twilio phone number and default number must be set.");
-      return;
-  }
-  if (!defaultNumber.startsWith("+")) {
+        const entityData = recordData.data[0];
+        let phone = entityData.Phone || "Number Needed";
+        let mobile = entityData.Mobile || "Number Needed"; // Set "Number Needed" if mobile is null
+
+        // Validate only if the number exists
+        const isPhoneValid = phone !== "Number Needed"? await validatePhoneNumber(phone) : false;
+        const isMobileValid = mobile !== "Number Needed" ? await validatePhoneNumber(mobile) : false;
+
+        // Set mobile as default number
+        setEnv((prevEnv) => ({
+            ...prevEnv,
+            full_name: entityData.Full_Name,
+            phone,
+            mobile,
+        }));
+
+        setPhoneValid(isPhoneValid);
+        setMobileValid(isMobileValid);
+        setDefaultNumber(mobile); // Always set mobile as default
+
+    } catch (error) {
+        console.log("Error fetching client details:", error);
+    }
+};
+
+
+  const validatePhoneNumber = async (phoneNumber) => {
+    
+    if (!phoneNumber || !accountSid || !authToken) return false;
+    if (!phoneNumber.startsWith("+")) {
       toast.error("Phone/mobile number must include a country code.");
       return;
   }
+
+    try {
+        const response = await axios.get(
+            `https://lookups.twilio.com/v1/PhoneNumbers/${encodeURIComponent(phoneNumber)}?Type=carrier`,
+            {
+                auth: {
+                    username: accountSid,
+                    password: authToken,
+                },
+            }
+        );
+
+        console.log('Verification response:', response.data);
+
+        // Twilio returns valid phone numbers with carrier info.
+        return response.data.carrier ? true : false;
+
+    } catch (error) {
+        console.error("Error validating phone number:", phoneNumber, error);
+        return false; // Assume invalid for any other errors.
+    }
+};
+
+
+const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
+
+  if (!twiliophone && !defaultNumber) {
+      toast.error("Twilio phone number and default number must be set.");
+      return;
+  }
+
   if (loadingMessages) return; // Prevent duplicate calls while fetching
    // Stop fetching if no more messages left
-   if (!initialFetch && !nextPageTokenRef.current) {
-    toast.info("No more chat history.");
+   if (!initialFetch && !nextPageTokenRef.current ) {
     return;
 }
   try {
@@ -257,7 +339,6 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
       console.log("Fetched messages:", newMessages);
 
       if (newMessages.length === 0) {
-          console.log("No more messages to load.");
           setLoadingMessages(false);
           return;
       }
@@ -452,8 +533,6 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
         return <MdDone />;
       case "delivered":
         return <IoCheckmarkDoneOutline />;
-      case "failed":
-        return <FiAlertCircle />;
       default:
         return null;
     }
@@ -560,6 +639,9 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
   };
   
   const handleRefershFeed = () => {
+    if ((!phoneValid && !mobileValid) || !twiliophone) {
+      return;
+  }
     setRefreshFeed(true)
     fetchPreviousMessagesFromTwilio(true);
   }
@@ -585,27 +667,52 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
 
   return (
     <Box className="twilioChatContainer">
-      <Box className="chatHeader">
+      {
+        !accountSid && !authToken ? (
+          <div className="missingCredientialContainer">
+            <RxQuestionMarkCircled />
+            <p>Missing Account SID & Token.</p>
+            <p>Please refer to settings</p>
+          </div>
+        ) : (
+          <>
+          <Box className="chatHeader">
         <div className="chatLogo"><IoMdPerson /></div>
         <div className="detailsContainer">
         <div className="clientDetails">
           <span>Receiver:</span>
           <span>{env.full_name}</span>
-          <Select
-            labelId="demo-simple-select-label"
-            id="demo-simple-select"
-            value={defaultNumber}
-            label="Number"
-            onChange={handleDefaultNumberChange}
-            sx={{
-              "& .MuiOutlinedInput-notchedOutline": {
-                border: "none",
-              },
-            }}
-          >
-            <MenuItem value={env.phone}><span style={{fontSize: '15px', fontWeight: 'bold', margin: '0px 5px'}}>Phone</span>{env.phone}</MenuItem>
-            <MenuItem value={env.mobile}><span style={{fontSize: '15px', fontWeight: 'bold', margin: '0px 5px'}}>Mobile</span>{env.mobile}</MenuItem>
-          </Select>
+          {
+            env.mobile == "Number Needed" && env.phone == "Number Needed" ? (
+              <span style={{color: 'red', fontWeight: '400', fontSize: '15px'}}>Mobile/Phone number not present</span>
+            ) : (
+              <Select
+  labelId="demo-simple-select-label"
+  id="demo-simple-select"
+  value={defaultNumber}
+  label="Number"
+  onChange={handleDefaultNumberChange}
+  sx={{
+    "& .MuiOutlinedInput-notchedOutline": {
+      border: "none",
+    },
+  }}
+>
+  <MenuItem value={env.phone} disabled={!phoneValid}>
+    <span style={{ fontSize: '15px', fontWeight: 'bold', margin: '0px 5px', color: 'black', opacity: phoneValid ? 1 : 0.5}}>
+      Phone {env.phone} {!phoneValid && <FiAlertCircle title="Invalid Number" style={{ color: 'red' }} />}
+    </span>
+  </MenuItem>
+
+  <MenuItem value={env.mobile} disabled={!mobileValid}>
+    <span style={{ fontSize: '15px', fontWeight: 'bold', margin: '0px 5px', color: 'black', opacity: mobileValid ? 1 : 0.5 }}>
+      Mobile {env.mobile} {!mobileValid && <FiAlertCircle title="Invalid Number" style={{ color: 'red' }} />}
+    </span>
+  </MenuItem>
+</Select>
+            )
+          }
+          
         </div>
         <div className="senderDetails">
           {
@@ -615,7 +722,8 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
           <Select
             labelId="demo-simple-select-label"
             id="demo-simple-select"
-            value={twiliophone}
+            displayEmpty
+            value={twiliophone || ""}
             label="Number"
             onChange={handleSelectionChange}
             sx={{
@@ -624,11 +732,19 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
               },
             }}
           >
+            <MenuItem value="" disabled>
+    Select a number
+  </MenuItem>
             {twilioPhoneNumbers.map((data, index) => (
-            <MenuItem key={index} value={data.number}>
+            <MenuItem key={index} value={data.number} disabled={data.status === "inactive"}>
               <div style={{display: 'flex', gap: '10px'}}>
                 <span style={{ fontSize: '15px', fontWeight: '700'}}>{data.friendlyName}</span>
                 <span style={{ fontSize: '15px', fontWeight: '300'}}>{data.number}</span>
+                {data.status === "inactive" && (
+        <span style={{ fontSize: '14px', fontWeight: '600', color: 'red' }}>
+          Inactive
+        </span>
+      )}
               </div>
             </MenuItem>
           ))}
@@ -641,63 +757,92 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
         </div>
       </Box>
       <Box className="chatContainer" ref={chatContainerRef}>
-        {loadingMessages && (
-          <div className="topLoaderContainer">
-          <img src={loaderGIF} alt="Loading..." className="topLoader" />
-        </div>
-        )}
-        {messages.length > 0 ? (
-          messages.map((message, index) => {
-            const isSent = message.from === twiliophone;
-            const showDateSeparator =
-              index === 0 ||
-              formatDate(messages[index - 1].date_sent) !==
-                formatDate(message.date_sent);
+  {loadingMessages && (
+    <div className="topLoaderContainer">
+      <img src={loaderGIF} alt="Loading..." className="topLoader" />
+    </div>
+  )}
 
-            return (
-              <React.Fragment key={message.sid}>
-                {showDateSeparator && (
-                  <Divider>
-                      <div className="dateSeparator">
-                      {formatDate(message.date_sent)}
-                      </div>
-                  </Divider>
+  {messages.length > 0 ? (
+    <>
+    {!nextPageTokenRef.current && (
+        <div className="endOfChatContainer">
+          <p>— End of Chat History —</p>
+        </div>
+      )}
+      {messages.map((message, index) => {
+        const isSent = message.from === twiliophone;
+        const showDateSeparator =
+          index === 0 ||
+          formatDate(messages[index - 1].date_sent) !== formatDate(message.date_sent);
+
+        return (
+          <React.Fragment key={message.sid}>
+            {showDateSeparator && (
+              <Divider>
+                <div className="dateSeparator">{formatDate(message.date_sent)}</div>
+              </Divider>
+            )}
+
+            <div className={`message ${isSent ? "sent" : "received"}`}>
+              <div className="messageContent">
+                {isSent && message.status === "failed" && (
+                  <Tooltip title="Twilio error">
+                    <span className="leftErrorIcon">
+                      <FiAlertCircle />
+                    </span>
+                  </Tooltip>
                 )}
-                <div className={`message ${isSent ? "sent" : "received"}`}>
-                  <div className="messageContent">
-                    <div
-                      style={{ whiteSpace: "pre-wrap", fontSize: "15px" }}
-                      dangerouslySetInnerHTML={{
-                        __html: formatMessage(message.body),
-                      }}
-                    />
-                    <div className="messageFooter">
-                      <span className="time">
-                        {new Date(message.date_sent).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
-                      </span>
-                      {isSent && (
-                        <span className="statusIcon">
-                          {getMessageStatusIcon(message.status)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <div
+                  style={{ whiteSpace: "pre-wrap", fontSize: "15px" }}
+                  dangerouslySetInnerHTML={{
+                    __html: formatMessage(message.body),
+                  }}
+                />
+                <div className="messageFooter">
+                  <span className="time">
+                    {new Date(message.date_sent).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </span>
+                  {isSent && (
+                    <span className="statusIcon">
+                      {getMessageStatusIcon(message.status)}
+                    </span>
+                  )}
                 </div>
-              </React.Fragment>
-            );
-          })
-        ) : (
-          <div className="emptyContainer">
-            
-            <img src={emptyChatLog} />
-           
-          </div>
-        )}
-      </Box>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </>
+  ) : (
+    <>
+    <div className="emptyContainer">
+      <img src={emptyChatLog} />
+    </div>
+    <Dialog open={showNoNumberModal} onClose={() => setShowNoNumberModal(false)}>
+    <DialogTitle style={{ fontWeight: "bold", textAlign: "center", color: "#d32f2f" }}>
+      🚨 No Default Number Selected! 🚨
+    </DialogTitle>
+    <DialogContent>
+      <p>🔹 Please choose a valid phone number before proceeding.</p>
+      <p>🔹 If you need to set a default number, update your settings in the SMS configuration panel.</p>
+      <p>💡 Need help? Contact support for assistance. 🚀</p>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={() => setShowNoNumberModal(false)} color="primary" variant="contained">
+        Close
+      </Button>
+    </DialogActions>
+  </Dialog>
+  </>
+  )}
+</Box>
+
       <Box className="chatInputContainer">
         
         <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="emojiButton">
@@ -776,6 +921,10 @@ const fetchPreviousMessagesFromTwilio = async (initialFetch = false) => {
         pauseOnHover
         theme="light"
       />
+      </>
+        )
+      }
+      
     </Box>
   );
 };

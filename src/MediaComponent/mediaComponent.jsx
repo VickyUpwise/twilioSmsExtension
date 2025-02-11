@@ -549,13 +549,6 @@ const MediaComponent = ({ accountSid, authToken, mediaComponent, attachment, att
     </Box>
   ) : null}
   {showWebcam && <CustomWebcam onImageCapture={handleImageCapture} onClose={setShowWebcam}/>}
-  {/* { (!accessTokenRef.current && !refreshTokenRef.current) &&<div>
-    
-     <p>Authorize Zoho Workdrive</p>
-    <button className='emojiButton'onClick={() => initiateZohoAuth()}>
-    <SiFusionauth />
-    </button>
-  </div> } */}
 </Box>
 
   );

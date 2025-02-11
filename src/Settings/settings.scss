@@ -10,6 +10,7 @@ $text-color: #ffffff; // White text color
     justify-content: center;
     background: #e1e1e1;
     overflow: hidden;
+    height: 95vh;
   }
   
   .innerContainer {
@@ -17,7 +18,7 @@ $text-color: #ffffff; // White text color
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    width: 37rem;
+    width: 70%;
     margin: 8px;
   }
   
@@ -29,29 +30,47 @@ $text-color: #ffffff; // White text color
     width: 100%;
     padding: 0;
     margin: 0;
-  }
-  
-  .neomorphic-text {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    align-items: center;
-    position: absolute;
-    top: 41%;
-    right: -9%;
-    transform: rotate(90deg);
-    padding: 0;
-    margin: 0;
-  
-    span {
-      font-family: 'Nunito';
-      font-size: 51px;
-      font-weight: bold;
-      color: #e1e1e1;
-      text-shadow: 8px -1px 6px #c5c5c5, -4px 4px 10px #f7f7f7;
-      display: inline-block;
+
+    .tableCell{
+      display: flex;
+      justify-content: space-evenly;
+      align-items: center;
+      width: 100%;
     }
   }
+  
+  // .neomorphic-text {
+  //   display: flex;
+  //   justify-content: center;
+  //   gap: 1rem;
+  //   align-items: center;
+  //   position: absolute;
+  //   top: 32%;
+  //   right: -1%;
+  //   transform: rotate(90deg);
+  //   padding: 0;
+  //   margin: 0;
+
+  //   .neomorphic-container-4 {
+  //     background: #e1e1e1;
+  //     display: flex;
+  //     border-radius: 40px 0 0 40px;
+  //     justify-content: center;
+  //     box-shadow: 5px -3px 7px #bcbcbc, -5px 3px 8px #efefef;
+  //     height: 62px;
+  //     width: 20rem;
+  //     align-items: center;
+
+  //     span {
+  //       font-family: 'Nunito';
+  //       font-size: 51px;
+  //       font-weight: bold;
+  //       color: #e1e1e1;
+  //       text-shadow: 8px -1px 6px #c5c5c5, -4px 4px 10px #f7f7f7;
+  //       display: inline-block;
+  //     }
+  //   }
+  // }
   
   .inputContainer {
     width: 100%;
@@ -62,33 +81,25 @@ $text-color: #ffffff; // White text color
     margin: 10px;
   }
   
-  .neomorphic-container-1 {
-    position: absolute;
-    top: 33%;
-    left: 7%;
-    img{
-      width: 115px;
-    height: 15rem;
-    }
-  }
+  // .neomorphic-container-1 {
+  //   position: absolute;
+  //   top: 33%;
+  //   left: 7%;
+  //   img{
+  //     width: 115px;
+  //   height: 15rem;
+  //   }
+  // }
   
-  .neomorphic-container-2 {
-    position: absolute;
-    top: 7px;
-    left: 2%;
-    img{
-      width: 50px;
-      height: 13rem;
-    }
-  }
-  
-  .neomorphic-container-4 {
-    width: 9rem;
-    background: #e1e1e1;
-    height: 35px;
-    border-radius: 40px 0 0 40px;
-    box-shadow: 5px -3px 7px #bcbcbc, -5px 3px 8px #efefef;
-  }
+  // .neomorphic-container-2 {
+  //   position: absolute;
+  //   top: 7px;
+  //   left: 2%;
+  //   img{
+  //     width: 50px;
+  //     height: 13rem;
+  //   }
+  // }
   
   .saveButton {
     display: flex;
@@ -175,5 +186,8 @@ $text-color: #ffffff; // White text color
         color: green;
         border: 1.5px solid #2ee019;
       }
+    }
+    .modalPara{
+      font-family: 'Nunito';
     }
   }
