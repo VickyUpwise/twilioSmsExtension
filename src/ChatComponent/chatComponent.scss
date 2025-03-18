@@ -7,23 +7,71 @@
     justify-content: center;
     padding: 5px;
     background-color: white;
+
+    .skeletonLoader{
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      width: 100%;
+      gap: 1rem;
+    
+      .skeletonHeader{
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        .receiverSkeleton{
+          width: 50%;
+          display: flex;
+          justify-content: space-evenly;
+          align-items: flex-start;
+        }
+        .clientSkeleton{
+          width: 30%;
+          display: flex;
+          justify-content: space-evenly;
+          align-items: flex-end;
+        }
+      }
+      .chatSkeleton{
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        .sentSkeleton{
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-end;
+          width: 100%;
+        }
+        .receiveSkeleton{
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-start;
+          width: 100%;
+        }
+      }
+      .inputSkeleton{
+        align-items: center;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    gap: 1rem;
+      }
+    }
     .missingCredientialContainer{
       display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     width: 100%;
     height: 98vh;
-    svg{
-      font-size: 7rem;
-    color: red;
-    box-shadow: inset -1px -1px 1px #d3d3d3, inset 4px 4px 4px #f7f1f1, 0px 0px 5px #c4c4c4;
-    border-radius: 50%;
-    }
-    p{
-      margin: 10px 0px 0px;
-    font-size: 23px;
-    font-weight: 100;
+    img{
+      width: 50%;
+      height: 100%;
     }
   }
 
@@ -31,7 +79,6 @@
       display: flex;
         width: -webkit-fill-available;
         padding: 7px;
-        border-radius: 10px;
         margin: 9px 0px;
 
         .chatLogo{
@@ -51,16 +98,27 @@
           align-items: center;
           justify-content: space-between;
           width: 100%;
+          .clientDetails, .senderDetails{
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            font-family: "Nunito", sans-serif;
+            font-weight: 700;
+            span{
+              margin: 0px 5px;
+            }
+            #clientDetailsSpan{
+                color: red;
+                font-weight: 400;
+                font-size: 15px;
+            }
+            .menuItemOption{
+              font-size: 15px;
+              font-weight: bold;
+              margin: 0px 5px;
+              color: "black";
+            }
         }
-        .clientDetails, .senderDetails{
-          display: flex;
-          justify-content: flex-start;
-          align-items: center;
-          font-family: "Nunito", sans-serif;
-          font-weight: 700;
-          span{
-            margin: 0px 5px;
-          }
       }
 
       #refreshButton{
@@ -90,6 +148,19 @@
         padding: 10px;
         scrollbar-width: none;
         width: -webkit-fill-available;
+
+        .topLoaderContainer{
+          width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+          img{
+            width: 3rem;
+    position: absolute;
+    top: 46px;
+          }
+        }
+
         .endOfChatContainer {
           color: #0f5ee7;
     font-size: 14px;
@@ -104,17 +175,7 @@
     }
         }
         
-        .topLoaderContainer{
-          width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-          img{
-            width: 3rem;
-    position: absolute;
-    top: 46px;
-          }
-        }
+        
         .dateSeparator {
           font-size: 12px;
     font-weight: 700;
@@ -218,18 +279,23 @@
       display: flex;
       align-items: flex-end;
       justify-content: space-evenly;
-      // background: #03045E;
       padding: 0px 3px;
-      // border-radius: 32px;
       height: 3rem;
 
-      #characterLimitWarning{
-        color: red;
+      .emojiButton{
+        font-size: 26px;
+        background: none;
+        border: none;
+        color: #928f8f;
+        margin: 0px;
+        padding: 4px;
+        cursor: pointer;
+      }
+      .emojiContianer{
         position: absolute;
-        background: #fff;
-        border-radius: 40px;
-        top: 81%;
-        left: 6%;
+        bottom: 14%;
+        left: 5%;
+        z-index: 10;
       }
       .textarea-container {
         position: relative;
@@ -245,14 +311,19 @@
           border-radius: 12px;
           color: black;
           font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
-          outline: none;
-          overflow-x: hidden;
-          overflow-y: auto;
           padding: 5px 10px;
           resize: none;
           scrollbar-width: none;
-          width: 100%;
-          transition: height 0.2s ease;
+          width: 44rem;
+                  min-height: 30px;
+                  max-height: 90px; // Limit max height
+                  font-size: 13px;
+                  outline: none;
+                  bottom: 0px;
+                  position: relative;
+                  resize: none;
+                  overflow: hidden scroll; // Prevent scrollbars
+                  transition: height 0.2s ease;
       
           &:focus {
             outline: none;
@@ -281,15 +352,7 @@
       }
       
 
-      .emojiButton{
-        font-size: 26px;
-        background: none;
-        border: none;
-        color: #928f8f;
-        margin: 0px;
-        padding: 4px;
-        cursor: pointer;
-      }
+      
 
       .button {
         width: 2.5rem;

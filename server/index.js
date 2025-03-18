@@ -16,6 +16,7 @@ var axios = require('axios')
 const multer = require('multer');
 // const upload = multer({ dest: 'uploads/' });
 const FormData = require('form-data');
+const twilio = require("twilio");
 
 process.env.PWD = process.env.PWD || process.cwd();
 
@@ -30,6 +31,7 @@ expressApp.use(bodyParser.json());
 expressApp.use(bodyParser.urlencoded({ extended: false }));
 expressApp.use(errorHandler());
 expressApp.use(cors())
+expressApp.use(express.json());
 
 
 expressApp.use('/', function (req, res, next) {
@@ -61,82 +63,83 @@ expressApp.get("/proxy", async (req, res) => {
     res.status(500).send("Error fetching the file");
   }
 });
+const storage = multer.memoryStorage();
 
-const fetchMyFolderId = async (accessToken) => {
-  try {
-    if (!accessToken) {
-      throw new Error("Access token is missing");
-    }
+// const fetchMyFolderId = async (accessToken) => {
+//   try {
+//     if (!accessToken) {
+//       throw new Error("Access token is missing");
+//     }
 
-    // Step 1: Get user info to retrieve zuid
-      const userInfoResponse = await axios.get(
-        "https://www.zohoapis.com/workdrive/api/v1/users/me",
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      const zuid = userInfoResponse.data.data.id;
+//     // Step 1: Get user info to retrieve zuid
+//       const userInfoResponse = await axios.get(
+//         "https://www.zohoapis.com/workdrive/api/v1/users/me",
+//         {
+//           headers: {
+//             Authorization: `Zoho-oauthtoken ${accessToken}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
+//       const zuid = userInfoResponse.data.data.id;
 
 
-    // Step 2: Get a list of all teams the user belongs to
-      const teamsResponse = await axios.get(
-        `https://www.zohoapis.com/workdrive/api/v1/users/${zuid}/teams`,
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+//     // Step 2: Get a list of all teams the user belongs to
+//       const teamsResponse = await axios.get(
+//         `https://www.zohoapis.com/workdrive/api/v1/users/${zuid}/teams`,
+//         {
+//           headers: {
+//             Authorization: `Zoho-oauthtoken ${accessToken}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
 
-      const teams = teamsResponse.data.data;
-      if (!teams || teams.length === 0) {
-        throw new Error("No teams found for the current user");
-      }
-      const teamId = teams[0].id; // Assuming the first team is used; update logic if needed
+//       const teams = teamsResponse.data.data;
+//       if (!teams || teams.length === 0) {
+//         throw new Error("No teams found for the current user");
+//       }
+//       const teamId = teams[0].id; // Assuming the first team is used; update logic if needed
     
-     // Step 3: Get the team_member_id of the current user
-      const teamMemberResponse = await axios.get(
-        `https://www.zohoapis.com/workdrive/api/v1/teams/${teamId}/currentuser`,
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+//      // Step 3: Get the team_member_id of the current user
+//       const teamMemberResponse = await axios.get(
+//         `https://www.zohoapis.com/workdrive/api/v1/teams/${teamId}/currentuser`,
+//         {
+//           headers: {
+//             Authorization: `Zoho-oauthtoken ${accessToken}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
 
-      const teamMemberId = teamMemberResponse.data.data.id;
-      if (!teamMemberId) {
-        throw new Error("Failed to fetch team_member_id");
-      }
+//       const teamMemberId = teamMemberResponse.data.data.id;
+//       if (!teamMemberId) {
+//         throw new Error("Failed to fetch team_member_id");
+//       }
 
-    // Step 4: Get the myfolder_id of the team member in the specified team
-      const myFolderResponse = await axios.get(
-        `https://www.zohoapis.com/workdrive/api/v1/users/${teamMemberId}/privatespace`,
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+//     // Step 4: Get the myfolder_id of the team member in the specified team
+//       const myFolderResponse = await axios.get(
+//         `https://www.zohoapis.com/workdrive/api/v1/users/${teamMemberId}/privatespace`,
+//         {
+//           headers: {
+//             Authorization: `Zoho-oauthtoken ${accessToken}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
 
-      const myFolderId = myFolderResponse.data.data[0].id;
+//       const myFolderId = myFolderResponse.data.data[0].id;
 
-      if (!myFolderId) {
-        throw new Error("Failed to fetch myfolder_id");
-      }
+//       if (!myFolderId) {
+//         throw new Error("Failed to fetch myfolder_id");
+//       }
 
-    return myFolderId;
+//     return myFolderId;
 
-  } catch (error) {
-    throw error;
-  }
-};
+//   } catch (error) {
+//     throw error;
+//   }
+// };
 
 // expressApp.post('/upload', upload.single('content'), async (req, res) => {
 //   try {
@@ -211,38 +214,38 @@ const fetchMyFolderId = async (accessToken) => {
 // });
 const upload = multer({ storage: multer.memoryStorage() });
 const TWILIO_FUNCTION_URL = "https://twiliomedia-4043.twil.io/upload";
-expressApp.post("/upload", upload.single("file"), async (req, res) => {
-  try {
-    const { accountSid, authToken } = req.body; // Receive credentials from frontend
-    const { originalname, buffer } = req.file;
-    const fileData = buffer.toString("base64"); // Convert to Base64
-    const SERVICE_SID = "ZSb44119a3d069db77dc18ff65f6df22f7";
+// expressApp.post("/upload", upload.single("file"), async (req, res) => {
+//   try {
+//     const { accountSid, authToken } = req.body; // Receive credentials from frontend
+//     const { originalname, buffer } = req.file;
+//     const fileData = buffer.toString("base64"); // Convert to Base64
+//     const SERVICE_SID = "ZSb44119a3d069db77dc18ff65f6df22f7";
 
-    if (!accountSid || !authToken) {
-      return res.status(400).json({ error: "Missing Twilio credentials" });
-    }
+//     if (!accountSid || !authToken) {
+//       return res.status(400).json({ error: "Missing Twilio credentials" });
+//     }
 
-    // Encode credentials for Basic Auth
-    const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}:${SERVICE_SID}`).toString("base64")}`;
+//     // Encode credentials for Basic Auth
+//     const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}:${SERVICE_SID}`).toString("base64")}`;
 
-    // Send file to Twilio Function with authentication
-    const response = await axios.post(
-      TWILIO_FUNCTION_URL,
-      { fileData, fileName: originalname },
-      {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+//     // Send file to Twilio Function with authentication
+//     const response = await axios.post(
+//       TWILIO_FUNCTION_URL,
+//       { fileData, fileName: originalname },
+//       {
+//         headers: {
+//           Authorization: authHeader,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
 
-    res.json({ url: response.data.url }); // Send Twilio Asset URL to frontend
-  } catch (error) {
-    console.error("Error uploading to Twilio:", error.response ? error.response.data : error);
-    res.status(500).json({ error: "Upload failed" });
-  }
-});
+//     res.json({ url: response.data.url }); // Send Twilio Asset URL to frontend
+//   } catch (error) {
+//     console.error("Error uploading to Twilio:", error.response ? error.response.data : error);
+//     res.status(500).json({ error: "Upload failed" });
+//   }
+// });
 
 // ✅ API to Verify Twilio Credentials
 expressApp.post("/verify-twilio", async (req, res) => {
@@ -266,35 +269,134 @@ expressApp.post("/verify-twilio", async (req, res) => {
   }
 });
 
-expressApp.post("/refresh-token", async (req, res) => {
-  const { refresh_token, client_id, client_secret } = req.body;
-
+const uploadToTwilioMCS = async (fileBuffer, fileName, mimeType, accountSid, authToken, serviceSid) => {
   try {
-    const response = await axios.post(
-      "https://accounts.zoho.com/oauth/v2/token",
-      new URLSearchParams({
-        refresh_token,
-        client_id,
-        client_secret,
-        grant_type: "refresh_token",
-      }).toString(),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
+    // Twilio MCS API URL
+    
+    const mediaUploadUrl = `https://mcs.us1.twilio.com/v1/Services/${serviceSid}/Media`;
+
+    // ✅ Prepare FormData for Twilio Upload
+    const formData = new FormData();
+    formData.append("file", fileBuffer, {
+      filename: fileName,
+      contentType: mimeType,
+    });
+
+    // ✅ Upload File to Twilio MCS
+    const response = await axios.post(mediaUploadUrl, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+      },
+    });
+
+    return response.data.sid; // ✅ Return the MediaSid
+  } catch (error) {
+    console.error("❌ Error uploading media to Twilio MCS:", error.response ? error.response.data : error.message);
+    return null;
+  }
+};
+
+// ✅ API Endpoint to Upload Multiple Files to Twilio MCS
+expressApp.post("/upload-to-twilio", upload.array("files", 10),async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+    const accountSid = req.headers["accountsid"];
+const authToken = req.headers["authtoken"];
+const serviceSid = req.headers["servicesid"];
+    console.log({"accountsid": accountSid}, {"authtoken":authToken}, {"servicesid":serviceSid})
+    if (!accountSid || !authToken || !serviceSid) {
+      return res.status(400).json({ error: "Missing required authentication parameters" });
+    }
+    // ✅ Process Each File
+    const uploadPromises = req.files.map(file =>
+      uploadToTwilioMCS(file.buffer, file.originalname, file.mimetype, accountSid, authToken, serviceSid)
     );
 
-    res.json(response.data); // Return the Zoho API response to the frontend
-  } catch (error) {
-    console.error("Error refreshing token:", error);
-    res.status(error.response?.status || 500).json({
-      message: error.message,
-      details: error.response?.data || {},
+    // ✅ Wait for All Uploads to Finish
+    const mediaSids = await Promise.all(uploadPromises);
+
+    // ✅ Filter out failed uploads
+    const successfulUploads = mediaSids.filter(sid => sid !== null);
+
+    if (successfulUploads.length === 0) {
+      return res.status(500).json({ success: false, error: "Failed to upload files to Twilio" });
+    }
+
+    // ✅ Send Response to Frontend
+    res.json({
+      success: true,
+      mediaSids: successfulUploads,
+      message: "Files uploaded successfully to Twilio",
     });
+  } catch (error) {
+    console.error("❌ Error processing upload:", error);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 });
 
+// expressApp.post("/refresh-token", async (req, res) => {
+//   const { refresh_token, client_id, client_secret } = req.body;
+
+//   try {
+//     const response = await axios.post(
+//       "https://accounts.zoho.com/oauth/v2/token",
+//       new URLSearchParams({
+//         refresh_token,
+//         client_id,
+//         client_secret,
+//         grant_type: "refresh_token",
+//       }).toString(),
+//       {
+//         headers: {
+//           "Content-Type": "application/x-www-form-urlencoded",
+//         },
+//       }
+//     );
+
+//     res.json(response.data); // Return the Zoho API response to the frontend
+//   } catch (error) {
+//     console.error("Error refreshing token:", error);
+//     res.status(error.response?.status || 500).json({
+//       message: error.message,
+//       details: error.response?.data || {},
+//     });
+//   }
+// });
+
+expressApp.post("/get-access-token", (req, res) => {
+  try {
+      const { accountSid, apiKey, apiSecret, serviceSid, identity} = req.query;
+
+      if (!identity) {
+          return res.status(400).json({ error: "Identity is required" });
+      }
+
+      // Create Twilio Access Token
+      const AccessToken = twilio.jwt.AccessToken;
+      const ChatGrant = AccessToken.ChatGrant;
+
+      const token = new AccessToken(accountSid, apiKey, apiSecret, {
+          identity: identity, // Unique identifier for user
+          ttl: 3600, // Token expires in 1 hour
+      });
+
+      // Grant access to Twilio Conversations
+      token.addGrant(
+          new ChatGrant({
+              serviceSid: serviceSid,
+          })
+      );
+
+      console.log("✅ Access Token Generated");
+      res.json({ token: token.toJwt() }); // Send JWT token to frontend
+  } catch (error) {
+      console.error("❌ Error generating access token:", error);
+      res.status(500).json({ error: "Server error" });
+  }
+});
 
 var options = {
   key: fs.readFileSync('./key.pem'),

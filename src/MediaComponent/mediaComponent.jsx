@@ -2,177 +2,364 @@ import React, { useRef, useState, useEffect } from "react";
 import "./mediaComponent.scss";
 import { Box} from "@mui/material";
 import { CameraAlt, Description, PhotoLibrary, Audiotrack} from "@mui/icons-material";
-import axios from 'axios';
 import { toast} from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import FilePreview from "../MediaPreview/mediaPreview";
 import CustomWebcam from "../WebCam/webCam";
-import Waveloading from '../utility/Loading.gif'
-import errorImage from '../utility/404Error.jpeg'
-import { TbXboxX } from "react-icons/tb";
-import { SiFusionauth } from "react-icons/si";
 
-const MediaComponent = ({ accountSid, authToken, mediaComponent, attachment, attachmentUrl, setAttachment, setAttachmentUrl, }) => {
-  const [fileType, setFileType] = useState(null);
-  const [showOptions, setShowOptions] = useState(true)
+const MediaComponent = ({mediaComponent, attachment, setAttachment}) => {
+  const [showOptions, setShowOptions] = useState(true);
   const [showWebcam, setShowWebcam] = useState(false);
   const [active, setActive] = useState(0);
-  const [showIndicator, setShowIndicator] = useState(false)
-  const [showError, setShowError] = useState(false);
-  const [showLoader, setShowLoader] = useState(false)
-  // const accessTokenRef = useRef("");
-  // const clientIdRef = useRef("");
-  // const clientSecretRef = useRef("");
-  // const refreshTokenRef = useRef("");
-  const parentIdRef = useRef("");
-  // const REDIRECT_URI = "https://plugin-twiliophonenumbervalidatorbyupro.zohosandbox.com/crm/tab/Leads/";
+  const [showIndicator, setShowIndicator] = useState(false);
+  const [fileCategory, setFileCategory] = useState(null); // ✅ Tracks file category
 
-  useEffect(() => {
-    fetchZohoWorkDriveDetails();
-  }, [mediaComponent]);
+  // ✅ Allowed MIME Types and Size Limits
+  const allowedMimeTypes = {
+    media: ["image/jpeg", "image/png", "image/gif", "video/mp4", "video/mpeg", "video/quicktime"],
+    document: [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ],
+    audio: ["audio/mp3", "audio/mpeg", "audio/wav"]
+  };
+  const maxFileSize = 25 * 1024 * 1024; // ✅ 25MB file size limit
 
-  const connectorAuthorization = async () => {
-    try{
-      const connector_name = 'twiliophonenumbervalidatorbyupro.zohoworkdrive'
-      const response = await ZOHO.CRM.CONNECTOR.authorize(connector_name);
-      console.log('response of connector', response);
+  // ✅ File Validation & Adding to Array
+  const handleFileSelection = (files, category) => {
+    if (!files.length) return;
+
+    // Prevent mixing different file categories
+    if (fileCategory && fileCategory !== category) {
+      toast.error("❌ You can only upload one type of file at a time.");
+      return;
     }
-    catch(error){
-      console.log('error in auth', error)
+
+    let validFiles = [];
+
+    for (const file of files) {
+      if (!allowedMimeTypes[category].includes(file.type)) {
+        toast.error(`❌ Unsupported file type: ${file.name}`);
+        continue;
+      }
+      if (file.size > maxFileSize) {
+        toast.error(`❌ File size exceeds 25MB: ${file.name}`);
+        continue;
+      }
+      validFiles.push(file);
     }
-  }
 
-  const getZohoWorkdriveDetails = async () => {
-    try {
-      // Step 1: Get User ID
-      const userResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getUserInfo", {});
-      console.log("User Info:", userResponse);
-      const userId = userResponse.data.id;
+    if (validFiles.length > 0) {
+      setAttachment((prevFiles) => [...prevFiles, ...validFiles]); // ✅ Add valid files to array
+      setFileCategory(category);
+      setShowOptions(false); // Hide options after selection
+    }
 
-      if (!userId) throw new Error("User ID not found");
+console.log("Selected Files:", validFiles)
+  };
 
-      // Step 2: Get Team Info using User ID
-      const teamResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getTeamInfo", { user_id: userId });
-      console.log("Team Info:", teamResponse);
-      const teamId = teamResponse.data.team_id;
+  // ✅ Allow Adding More Files
+  const handleAddMoreFiles = () => {
+    if (!fileCategory) {
+      toast.error("Please select a file type first.");
+      return;
+    }
 
-      if (!teamId) throw new Error("Team ID not found");
+    let acceptTypes = allowedMimeTypes[fileCategory].join(",");
+    handleFileInput(acceptTypes, fileCategory);
+  };
 
-      // Step 3: Get Team Member Info using Team ID
-      const teamMemberResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getTeamMemberInfo", { team_id: teamId });
-      console.log("Team Member Info:", teamMemberResponse);
-      const teamMemberId = teamMemberResponse.data.team_member_id;
+  // ✅ Camera Capture Handling
+  const handleImageCapture = (imageFile) => {
+    handleFileSelection([imageFile], "media");
+    setShowWebcam(false);
+  };
 
-      if (!teamMemberId) throw new Error("Team Member ID not found");
+  // ✅ File Input Handlers
+  const handleFileInput = (acceptTypes, category) => {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = acceptTypes;
+    fileInput.multiple = true;
+    fileInput.onchange = (event) => handleFileSelection(event.target.files, category);
+    fileInput.click();
+  };
 
-      // Step 4: Get Parent ID using Team Member ID
-      const parentResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("ZohoWorkDrive.getParentId", { team_member_id: teamMemberId });
-      console.log("Parent ID Info:", parentResponse);
-      const parentId = parentResponse.data.parent_id;
+  // ✅ Remove Individual File
+  const handleRemoveFile = (index) => {
+    const updatedFiles = attachment.filter((_, i) => i !== index);
+    setAttachment(updatedFiles);
 
-      if (!parentId) throw new Error("Parent ID not found");
-
-      return parentId;
-  } catch (error) {
-      console.error("Error fetching Zoho WorkDrive data:", error);
-  }
-  }
-
-  const fetchZohoWorkDriveDetails = async () => {
-    try {
-      // const clientId = await ZOHO.CRM.API.getOrgVariable(
-      //   "twiliophonenumbervalidatorbyupro__work_drive_clientId"
-      // );
-      // const clientSecret = await ZOHO.CRM.API.getOrgVariable(
-      //   "twiliophonenumbervalidatorbyupro__work_drive_client_secret"
-      // );
-      // const aToken = await ZOHO.CRM.API.getOrgVariable(
-      //   "twiliophonenumbervalidatorbyupro__work_drive_access_token"
-      // );
-      // const rToken = await ZOHO.CRM.API.getOrgVariable(
-      //   "twiliophonenumbervalidatorbyupro__work_drive_refresh_token"
-      // );
-      const parent_i_d = await ZOHO.CRM.API.getOrgVariable(
-        "twiliophonenumbervalidatorbyupro__parentId"
-      );
-  
-      // clientIdRef.current = clientId.Success.Content || "";
-      // clientSecretRef.current = clientSecret.Success.Content || "";
-      // accessTokenRef.current = aToken.Success.Content || "";
-      // refreshTokenRef.current = rToken.Success.Content || "";
-      parentIdRef.current = parent_i_d.Success.Content || "";
-  
-      console.log("Fetched details:", {
-        // clientId: clientIdRef.current,
-        // clientSecret: clientSecretRef.current,
-        // accessToken: accessTokenRef.current,
-        // refreshToken: refreshTokenRef.current,
-        parentId: parentIdRef.current,
-      });
-    } catch (error) {
-      console.error("Error getting Zoho WorkDrive details", error);
-      toast.error("Something went wrong. Please try again.");
+    if (updatedFiles.length === 0) {
+      setFileCategory(null); // Reset category if no files left
+      setShowOptions(true);
     }
   };
 
-  const upoladFile = async (file) => {
-    try {
-      if (!file) {
-          console.error("No file selected for upload.");
-          return;
-      }
+  // ✅ Remove All Files
+  const handleRemoveAll = () => {
+    setAttachment([]);
+    setFileCategory(null);
+    setShowOptions(true);
+  };
 
-      // Extract file properties
-      const fileName = file.name;
-      const fileType = file.type;
-
-      // Prepare request body
-      var data = {
-        "VARIABLES": {
-            "filename": encodeURIComponent(fileName), // URL-encoded filename
-            "parent_id": parentIdRef.current, // REQUIRED: Folder ID where the file will be stored
-            "override-name-exist": "false" // Optional: Set to "true" to overwrite
-        },
-        "CONTENT_TYPE": "multipart",
-        "PARTS": [
-            {
-                "headers": {
-                    "Content-Type": "application/json"
-                },
-                "content": {
-                    "filename": encodeURIComponent(fileName),
-                    "parent_id": parentIdRef.current,
-                    "override-name-exist": "false"
-                }
-            },
-            {
-                "headers": {
-                    "Content-Disposition": `file; name="content"; filename="${fileName}"`
-                },
-                "content": "__FILE__"
-            }
-        ],
-        "FILE": {
-            "fileParam": "content",
-            "file": file
-        }
-    };
-
-      console.log("Uploading file:", data);
-
-      // Call Zoho API Connector
-      const response = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.uploadfile", data);
-      
-      console.log("Upload Response:", response);
-      return response;
-  } catch (error) {
-    if(error.code === '403' && error.message === 'Authorization Exception'){
-      const responeAuth = await connectorAuthorization()
-      console.log('reponseAuth', responeAuth)
+  // ✅ Options for Media Upload
+  const options = [
+    {
+      icon: <CameraAlt fontSize="medium" />,
+      name: "Camera",
+      onClick: () => {
+        setShowOptions(false);
+        setShowWebcam(true);
+      },
+      dis: "-109"
+    },
+    {
+      icon: <Description fontSize="medium" />,
+      name: "Document",
+      onClick: () => handleFileInput(
+        allowedMimeTypes.document.join(","),
+        "document"
+      ),
+      dis: "-36"
+    },
+    {
+      icon: <PhotoLibrary fontSize="medium" />,
+      name: "Media",
+      onClick: () => handleFileInput(
+        allowedMimeTypes.media.join(","),
+        "media"
+      ),
+      dis: "39"
+    },
+    {
+      icon: <Audiotrack fontSize="medium" />,
+      name: "Audio",
+      onClick: () => handleFileInput(
+        allowedMimeTypes.audio.join(","),
+        "audio"
+      ),
+      dis: "114"
     }
-      console.error("Error uploading file:", error);
-  }
-  }
+  ];
+
+  return (
+    <Box className="mediaInnerComponent" sx={{
+      display: "flex",
+      flexDirection: "column",
+      position: "absolute",
+      bottom: "58px",
+      left: "68px",
+    }}>
+      {/* ✅ Show Options Menu */}
+      {showOptions && attachment.length === 0 ? (
+        <div className="navigation">
+          <ul className="menu">
+            {options.map((option, index) => (
+              <li
+                key={index}
+                className="list"
+                onMouseEnter={() => {
+                  setActive(index);
+                  setShowIndicator(true);
+                }}
+                onMouseLeave={() => {
+                  setActive(0);
+                  setShowIndicator(false);
+                }}
+              >
+                <div className="menu-link" onClick={option.onClick}>
+                  <div className="icon">{option.icon}</div>
+                  <span className="text">{option.name}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {showIndicator && (
+            <div className="indicator" style={{
+              transform: `translateX(${options[active]?.dis}px)`,
+            }}></div>
+          )}
+        </div>
+      ) : (
+        // ✅ Show File Preview for Selected Files
+        <Box className="filePreviewContainer">
+          <FilePreview 
+            files={attachment} 
+            removeFile={handleRemoveFile} 
+            removeAll={handleRemoveAll} 
+            addMore={handleAddMoreFiles} // ✅ Pass Add More Function
+          />
+        </Box>
+      )}
+
+      {/* ✅ Webcam Capture */}
+      {showWebcam && <CustomWebcam onImageCapture={handleImageCapture} onClose={() => setShowWebcam(false)} />}
+    </Box>
+  );
+};
+
+export default MediaComponent;
+
+// const accessTokenRef = useRef("");
+  // const clientIdRef = useRef("");
+  // const clientSecretRef = useRef("");
+  // const refreshTokenRef = useRef("");
+// const REDIRECT_URI = "https://plugin-twiliophonenumbervalidatorbyupro.zohosandbox.com/crm/tab/Leads/";
+
+  // useEffect(() => {
+  //  getZohoWorkdriveDetails();
+  // }, [mediaComponent]);
+
+  // const connectorAuthorization = async () => {
+  //   try{
+  //     const connector_name = 'twiliophonenumbervalidatorbyupro.zohoworkdrive'
+  //     const response = await ZOHO.CRM.CONNECTOR.authorize(connector_name);
+  //     console.log('response of connector', response);
+  //   }
+  //   catch(error){
+  //     console.log('error in auth', error)
+  //   }
+  // }
+
+  // const getZohoWorkdriveDetails = async () => {
+  //   try {
+  //     // Step 1: Get User ID
+  //     const userResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.getUserInfo", {});
+  //     console.log("User Info:", userResponse);
+  //     const userparsedResponse = JSON.parse(userResponse.response);
+  //     const userId = userparsedResponse.data.id;
+
+  //     if (!userId) throw new Error("User ID not found");
+
+  //     // Step 2: Get Team Info using User ID
+  //     const teamResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.getTeamInfo", { zuid: userId });
+  //     console.log("Team Info:", teamResponse);
+  //     const teamparsedResponse = JSON.parse(teamResponse.response);
+  //     const teamId = teamparsedResponse.data[0].id;
+
+  //     if (!teamId) throw new Error("Team ID not found");
+
+  //     // Step 3: Get Team Member Info using Team ID
+  //     const teamMemberResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.getTeamMemberInfo", { teamId: teamId });
+  //     console.log("Team Member Info:", teamMemberResponse);
+  //     const teamMemberparsedResponse = JSON.parse(teamMemberResponse.response);
+  //     const teamMemberId = teamMemberparsedResponse.data.id;
+
+  //     if (!teamMemberId) throw new Error("Team Member ID not found");
+
+  //     // Step 4: Get Parent ID using Team Member ID
+  //     const parentResponse = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.getParentId", { teamMemberId: teamMemberId });
+  //     console.log("Parent ID Info:", parentResponse);
+  //     const parentparsedResponse = JSON.parse(parentResponse.response);
+  //     const parentId = parentparsedResponse.data[0].id;
+  //     parentIdRef.current = parentId;
+
+  //     if (!parentId) throw new Error("Parent ID not found");
+
+  //     return parentId;
+  // } catch (error) {
+  //     console.error("Error fetching Zoho WorkDrive data:", error);
+  // }
+  // }
+
+  // const fetchZohoWorkDriveDetails = async () => {
+    //   try {
+  //     // const clientId = await ZOHO.CRM.API.getOrgVariable(
+  //     //   "twiliophonenumbervalidatorbyupro__work_drive_clientId"
+  //     // );
+  //     // const clientSecret = await ZOHO.CRM.API.getOrgVariable(
+  //     //   "twiliophonenumbervalidatorbyupro__work_drive_client_secret"
+  //     // );
+  //     // const aToken = await ZOHO.CRM.API.getOrgVariable(
+  //     //   "twiliophonenumbervalidatorbyupro__work_drive_access_token"
+  //     // );
+  //     // const rToken = await ZOHO.CRM.API.getOrgVariable(
+  //     //   "twiliophonenumbervalidatorbyupro__work_drive_refresh_token"
+  //     // );
+  //     const parent_i_d = await ZOHO.CRM.API.getOrgVariable(
+  //       "twiliophonenumbervalidatorbyupro__parentId"
+  //     );
+  
+  //     // clientIdRef.current = clientId.Success.Content || "";
+  //     // clientSecretRef.current = clientSecret.Success.Content || "";
+  //     // accessTokenRef.current = aToken.Success.Content || "";
+  //     // refreshTokenRef.current = rToken.Success.Content || "";
+  //     parentIdRef.current = parent_i_d.Success.Content || "";
+  
+  //     console.log("Fetched details:", {
+  //       // clientId: clientIdRef.current,
+  //       // clientSecret: clientSecretRef.current,
+  //       // accessToken: accessTokenRef.current,
+  //       // refreshToken: refreshTokenRef.current,
+  //       parentId: parentIdRef.current,
+  //     });
+  //   } catch (error) {
+  //     console.error("Error getting Zoho WorkDrive details", error);
+  //     toast.error("Something went wrong. Please try again.");
+  //   }
+  // };
+
+  // const upoladFile = async (file) => {
+  //   try {
+  //     if (!file) {
+  //         console.error("No file selected for upload.");
+  //         return;
+  //     }
+
+  //     // Extract file properties
+  //     const fileName = file.name;
+  //     const fileType = file.type;
+
+  //     // Prepare request body
+  //     var data = {
+  //       "VARIABLES": {
+  //           "file_name": fileName,
+  //           "parent_id": parentIdRef.current, // REQUIRED: Folder ID
+  //           "override-name-exist": "false" // Optional: Set to "true" to overwrite
+  //       },
+  //       "CONTENT_TYPE": "multipart",
+  //       "PARTS": [
+  //           {
+  //               "headers": {
+  //                   "Content-Type": "application/json"
+  //               },
+  //               "content": JSON.stringify({
+  //                   "file_name": fileName,
+  //                   "parent_id": parentIdRef.current,
+  //                   "override-name-exist": "false"
+  //               })
+  //           },
+  //           {
+  //               "headers": {
+  //                   "Content-Disposition": `form-data; name="content"; filename="${fileName}"`,
+  //                   "Content-Type": file.type // Set actual file type
+  //               },
+  //               "content": file
+  //           }
+  //       ]
+  //   };
+
+  //     console.log("Uploading file:", data);
+
+  //     // Call Zoho API Connector
+  //     const response = await ZOHO.CRM.CONNECTOR.invokeAPI("twiliophonenumbervalidatorbyupro.zohoworkdrive.uploadfile", data);
+      
+  //     console.log("Upload Response:", response);
+  //     return response;
+  // } catch (error) {
+  //   if(error.code === '403' && error.message === 'Authorization Exception'){
+  //     const responeAuth = await connectorAuthorization()
+  //     console.log('reponseAuth', responeAuth)
+  //   }
+  //     console.error("Error uploading file:", error);
+  // }
+  // }
 
   // Step 1: Redirect user to Zoho OAuth Authorization Page
   // const initiateZohoAuth = () => {
@@ -339,219 +526,34 @@ const MediaComponent = ({ accountSid, authToken, mediaComponent, attachment, att
   //   }
   // };
 
-  const handleFileSelection = async (file) => {
-    if (file.size > 250 * 1024 * 1024) {
-      toast.error(
-        "File size exceeds 250MB limit. Please reduce the file size."
-      );
-      return;
-    }
-    setAttachment(file);
-    setShowOptions(false);// Hide the options card 
-    // uploadFileToZoho(file);
-    upoladFile(file)
-    // handleUpload(file)
-    // if(!accessTokenRef.current && !refreshTokenRef.current){
-    //   toast.error('Please Authorize Zoho WorkDrive.')
-    //   return;
-    // }
-    // else{}
-  };
-
-  const handleCameraClick = () => {
-    setShowOptions(false);
-    setShowWebcam(true); // Show the CustomWebcam component
-
-  };
-
-  const handleImageCapture = (imageSrc) => {
-    handleFileSelection(imageSrc); // Save the captured image
-    setShowWebcam(false); // Close the webcam component
-  };
-
-  const handleDocumentClick = () => {
-    const documentInput = document.createElement("input");
-    documentInput.type = "file";
-    documentInput.accept =
-      "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
-    documentInput.onchange = (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        handleFileSelection(file);
-      }
-    };
-    documentInput.click();
-  };
-
-  const handleMediaClick = () => {
-    const mediaInput = document.createElement("input");
-    mediaInput.type = "file";
-    mediaInput.accept = "image/*,video/*";
-    mediaInput.onchange = (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        handleFileSelection(file);
-      }
-    };
-    mediaInput.click();
-  };
-
-  const handleMp3Click = () => {
-    const audioInput = document.createElement("input");
-    audioInput.type = "file";
-    audioInput.accept = "audio/mp3"; // Restrict to MP3 files
-    audioInput.onchange = (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        handleFileSelection(file); // Process the selected MP3 file
-      }
-    };
-    audioInput.click();
-  };
-
-  const handleRemove = () => {
-    setAttachment(null);
-    setAttachmentUrl(null);
-    setShowOptions(true);
-  }
+ // const refreshAccessToken = async () => {
+  //   try {
+  //     const response = await axios.post(
+  //       "https://127.0.0.1:5000/refresh-token",
+  //       {
+  //         refresh_token: refreshTokenRef.current,
+  //         client_id: clientIdRef.current,
+  //         client_secret: clientSecretRef.current,
+  //       }
+  //     );
   
-  const handleShowError = () => {
-    setShowError(false);
-    handleRemove();
-}
-
-  const options = [
-    {
-      icon: <CameraAlt fontSize="medium" />,
-      name: "Camera",
-      onClick: handleCameraClick,
-      dis: "-109",
-    },
-    {
-      icon: <Description fontSize="medium" />,
-      name: "Document",
-      onClick: handleDocumentClick,
-      dis: "-36",
-    },
-    {
-      icon: <PhotoLibrary fontSize="medium" />,
-      name: "Media",
-      onClick: handleMediaClick,
-      dis: "39",
-    },
-    {
-      icon: <Audiotrack fontSize="medium" />,
-      name: "Audio",
-      onClick: handleMp3Click,
-      dis: "114",
-    },
-  ];
-
-  const refreshAccessToken = async () => {
-    try {
-      const response = await axios.post(
-        "https://127.0.0.1:5000/refresh-token",
-        {
-          refresh_token: refreshTokenRef.current,
-          client_id: clientIdRef.current,
-          client_secret: clientSecretRef.current,
-        }
-      );
+  //     const { access_token } = response.data;
   
-      const { access_token } = response.data;
+  //     accessTokenRef.current = access_token; // Update the ref
   
-      accessTokenRef.current = access_token; // Update the ref
+  //     const data = {
+  //       apiname: "twiliophonenumbervalidatorbyupro__work_drive_access_token",
+  //       value: access_token,
+  //     };
   
-      const data = {
-        apiname: "twiliophonenumbervalidatorbyupro__work_drive_access_token",
-        value: access_token,
-      };
+  //     await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", data);
+  //     console.log("Access token refreshed:", access_token);
   
-      await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", data);
-      console.log("Access token refreshed:", access_token);
-  
-      return access_token; // Return the new token
-    } catch (error) {
-      console.error("Error refreshing access token:", error);
-      toast.error(
-        "Failed to refresh Zoho WorkDrive access token. Please reauthorize."
-      );
-    }
-  };
-
-  return (
-    <Box
-  className="mediaInnerComponent"
-  sx={{
-    display: "flex",
-    flexDirection: "column",
-    position: "absolute",
-    bottom: "58px",
-    left: "80px",
-  }}
->
-  {showOptions && !attachment && !showError && !attachmentUrl ? (
-    <div className="navigation">
-      <ul className="menu">
-        {options.map((option, index) => (
-          <li
-            key={index}
-            className="list"
-            onMouseEnter={() => {
-              setActive(index);
-              setShowIndicator(true);
-            }}
-            onMouseLeave={() => {
-              setActive(0);
-              setShowIndicator(false);
-            }}
-          >
-            <div
-              className="menu-link"
-              onClick={() => {
-                option.onClick();
-              }}
-            >
-              <div className="icon">{option.icon}</div>
-              <span className="text">{option.name}</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {showIndicator && (
-        <div
-          className="indicator"
-          style={{
-            transform: `translateX(${options[active]?.dis}px)`,
-          }}
-        ></div>
-      )}
-    </div>
-  ) : showError ? (
-    <Box className="errorComponent">
-      <img className="loadingVideo" src={errorImage} alt="error" />
-      <button onClick={handleShowError} id="errorButton">
-        <TbXboxX />
-      </button>
-    </Box>
-  ) : !attachmentUrl && attachment ? (
-    <Box className="loadingVideoContainer">
-      <img src={Waveloading} alt="Loading" className="loadingVideo" />
-      <span id="loadingcaption">Getting it. Wait a bit...</span>
-    </Box>
-  ) : attachmentUrl ? (
-    <Box className="filePreviewContainer">
-      <FilePreview
-        fileType={fileType}
-        attachment={attachment}
-        remove={handleRemove}
-      />
-    </Box>
-  ) : null}
-  {showWebcam && <CustomWebcam onImageCapture={handleImageCapture} onClose={setShowWebcam}/>}
-</Box>
-
-  );
-};
-
-export default MediaComponent;
+  //     return access_token; // Return the new token
+  //   } catch (error) {
+  //     console.error("Error refreshing access token:", error);
+  //     toast.error(
+  //       "Failed to refresh Zoho WorkDrive access token. Please reauthorize."
+  //     );
+  //   }
+  // };

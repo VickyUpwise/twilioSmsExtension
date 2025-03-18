@@ -37,16 +37,16 @@ module.exports = {
         return webpackConfig;
     }
   },
-  // resolve: {
-  //   fallback: {
-  //     "path": require.resolve('path-browserify'),
-  //     "buffer": require.resolve('buffer'),
-  //     "crypto": require.resolve("crypto-browserify"),
-  //     "fs" : false,
-  //     "url" : false,
-  //     "querystring": false,
-  //   },
-  // },
+  resolve: {
+    fallback: {
+      "path": require.resolve('path-browserify'),
+      "buffer": require.resolve('buffer'),
+      "crypto": false,
+      "fs" : false,
+      "url" : false,
+      "querystring": false,
+    },
+  },
 };
 
 // const HtmlWebpackPlugin = require('html-webpack-plugin');

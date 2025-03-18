@@ -4,24 +4,14 @@ import { toast, ToastContainer } from "react-toastify";
 import CircularProgress from '@mui/material/CircularProgress';
 import "react-toastify/dist/ReactToastify.css";
 import { motion } from "framer-motion";
-import { Table, TableBody, TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  TablePagination,
-  Switch,
-  Box, styled, TextField, Typography
-} from "@mui/material";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
-
+import { Table, TableBody, TableCell,TableContainer, TableHead,TableRow,IconButton,TablePagination,Switch,Box, styled, TextField, Typography, FormControl} from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Skeleton,InputLabel, Select,MenuItem } from "@mui/material";
 import Tooltip from '@mui/material/Tooltip'
-import { IoIosAddCircleOutline } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
-import neo1 from '../utility/C-HM Conseil .jpeg'
-import neo2 from '../utility/C-HM Conseil - Awwwards Honorable Mention.jpeg'
 import { MdOutlineDone } from "react-icons/md";
 import { FiAlertTriangle } from "react-icons/fi";
+import { IoIosArrowUp } from "react-icons/io";
+import { MdKeyboardArrowDown } from "react-icons/md";
 
 const CustomTextField = styled(TextField)({
   width: '100%',
@@ -100,6 +90,40 @@ const AddButton = styled(IconButton)({
   },
 });
 
+const CustomFormControl = styled(FormControl)({
+  width: '100%',
+  background: '#faf8f8d1', // White background
+  borderRadius: '10px', // Rounded corners
+  margin: '0px',
+  boxShadow: 'inset 1px 1px 5px rgba(0, 0, 0, 0.2), inset -4px -5px 3px 0px #FFFFFF', // Neomorphic shadows
+  '&MuiInputLabel-root':{
+    color: '#898686a6',
+    transform: "translate(18px, 11px) scale(1)", // Position the label
+    fontWeight: "bold", // Make the label bold
+    transition: 'smooth 0.3s',
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+  color: "#42444aa1", // Change label color when focused (darker blue)
+  transform: "translate(13px, -14px) scale(1)",
+},
+  '& .MuiOutlinedInput-root': {
+    '& MuiInputBase-input':{
+      padding: '10.5px 14px'
+    },
+    '& fieldset': {
+      border: 'none', // Remove default border
+    },
+    '&:hover fieldset': {
+      border: 'none', // Remove border on hover
+    },
+    '&.Mui-focused fieldset': {
+      border: 'none', // Remove border when focused
+    },
+    '&.MuiInputBase-input':{
+      padding: '12px 14px'
+    }
+  },
+})
 
 const Settings = () => {
   const [twilioSID, setTwilioSID] = useState("");
@@ -107,7 +131,6 @@ const Settings = () => {
   const [twilioPhoneNumbers, setTwilioPhoneNumbers] = useState([]);
   const newTwilioPhoneNumbersRef = useRef([])
   const [currentTwilioNumber, setCurrentTwilioNumber] = useState("");
-  const [selectedRowId, setSelectedRowId] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(3);
   const [isEditing, setIsEditing] = useState(false);
@@ -122,151 +145,265 @@ const Settings = () => {
   const [initialSid, setInitialSid] = useState(""); // Original SID
   const [initialToken, setInitialToken] = useState(""); // Original Token
   const [loading , setShowLoading] = useState(false)
-
+  const [conversationServiceSid, setConversationServiceSid] = useState({friendlyName:'', Sid:''})
+  const [invalidServiceSid, setInvalidServiceSid] = useState(false)
+  const [serviceSidList, setServiceSidList] = useState([]); // Stores the list of available SIDs
+const [dropdownOpen, setDropdownOpen] = useState(false); // Track dropdown state
+//fetch twilio Credentials from zoho
   useEffect(() => {
     ZOHO.embeddedApp.on("PageLoad", fetchTwilioCredentials);
     ZOHO.embeddedApp.init().then(() => {});
   }, []);
 
-  const fetchTwilioCredentials = async () => {
-    try {
-      setShowLoading(true)
-      const twilioSID = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_SID");
-      const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
-      const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
-      const twilioPhoneNumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
-      
-      // Parse the responses if necessary (assuming Success.Content contains the value)
-      const sidContent = twilioSID.Success.Content || "";
-      const tokenContent = twilioToken.Success.Content || "";
-      const numberContent = currentTwilioNumber.Success.Content || "";
-      const phoneNumbers = JSON.parse(twilioPhoneNumbers.Success.Content) || [];
-console.log("Number: ", numberContent);
-console.log("Phone Numbers: ", phoneNumbers);
-
-      setTwilioSID(sidContent)
-      setTwilioToken(tokenContent)
-      setCurrentTwilioNumber(numberContent)
-        setShowLoading(false)
-      setTwilioPhoneNumbers(phoneNumbers)
-      setInitialSid(sidContent); // Store original SID
-      setInitialToken(tokenContent); // Store original Token
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
+  //fetching twilio numbers
   useEffect(() => {
-      const fetchTwilioPhoneNumbers = async (accountSid, authToken) => {
-        const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
-      
-        try {
-          const response = await fetch(url, {
-            method: "GET",
-            headers: {
-              "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
-            }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const fetchedNumbers = data.incoming_phone_numbers.map(num => num.phone_number);
-  
-            // Map over existing stored numbers to check status
-            const updatedStoredNumbers = twilioPhoneNumbers.map(storedNum => ({
-              ...storedNum,
-              status: fetchedNumbers.includes(storedNum.number) ? "active" : "inactive",
-            }));
-  
-            // Set the updated stored numbers with statuses
-            setTwilioPhoneNumbers(updatedStoredNumbers);
-  
-            // Filter out numbers that are already in the stored list
-            const uniqueNumbers = fetchedNumbers.filter(num => !twilioPhoneNumbers.some(tw => tw.number === num));
-            
-            // Add "Selected Option" as default
-            setFetchNumber(["Selected Option", ...uniqueNumbers]);
-          } else {
-            const errorData = await response.json();
-            console.error("❌ Failed to fetch Twilio phone numbers:", errorData);
-            return { success: false, error: errorData };
-          }
-        } catch (error) {
-          console.error("⚠️ Error fetching Twilio phone numbers:", error);
-          return { success: false, error };
-        }
-      };
-      if(twilioSID, twiliotoken, isEditing){
-      fetchTwilioPhoneNumbers(twilioSID, twiliotoken);
-      }
-  },[twilioSID, twiliotoken, isEditing])
-  
-  const verifyTwilioCredentials = async (accountSid, authToken) => {
-    if (!accountSid || !authToken) {
-      return toast.error("Missing Twilio SID or Auth Token");
+    if(twilioSID, twiliotoken, isEditing){
+    fetchTwilioPhoneNumbers(twilioSID, twiliotoken);
     }
+  },[twilioSID, twiliotoken, isEditing])
+
+  const fetchTwilioCredentials = async (state = true) => {
     try {
-      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+        setShowLoading(state);
+
+        // Fetch Twilio credentials from Zoho CRM
+        const twilioSID = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_SID");
+        const twilioToken = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Twilio_Token");
+        const currentTwilioNumber = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Current_Twilio_Number");
+        const twilioPhoneNumbers = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Phone_Numbers");
+        const conversationServiceSid = await ZOHO.CRM.API.getOrgVariable("twiliophonenumbervalidatorbyupro__Conversation_Service_SID");
+
+        // Parse responses correctly
+        const sidContent = twilioSID.Success?.Content || "";
+        const tokenContent = twilioToken.Success?.Content || "";
+        const numberContent = currentTwilioNumber.Success?.Content || "";
+        const phoneNumbers = twilioPhoneNumbers.Success?.Content ? JSON.parse(twilioPhoneNumbers.Success.Content) : [];
+        const conversationServiceSidContent = conversationServiceSid.Success?.Content || "";
+
+        let serviceFriendlyName = "Unknown";
+        if (serviceSidList.length > 0) {
+            const matchedService = serviceSidList.find(service => service.sid === conversationServiceSidContent);
+            serviceFriendlyName = matchedService ? matchedService.name : "Unknown";
+        }
+
+        // Update state with fetched credentials
+        setTwilioSID(sidContent);
+        setTwilioToken(tokenContent);
+        setCurrentTwilioNumber(numberContent);
+        setTwilioPhoneNumbers(phoneNumbers);
+        setConversationServiceSid({ friendlyName: serviceFriendlyName, Sid: fetchedSid });
+
+        // Store initial values for change detection
+        setInitialSid(sidContent);
+        setInitialToken(tokenContent);
+
+        // ✅ **Return values to be used in `saveCustomPropertiesOfTwilio`**
+        return {
+            twilioSID: sidContent,
+            twilioToken: tokenContent,
+            currentTwilioNumber: numberContent,
+            twilioPhoneNumbers: phoneNumbers,
+            conversationServiceSid: { friendlyName: serviceFriendlyName, Sid: fetchedSid }
+        };
+    } catch (error) {
+        console.error("❌ Error fetching Twilio credentials:", error);
+        return {}; // Return an empty object on error
+    } finally {
+        setShowLoading(false);
+    }
+};
+
+  const fetchTwilioPhoneNumbers = async (accountSid, authToken) => {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
+  
+    try {
+      const response = await fetch(url, {
         method: "GET",
         headers: {
           "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
-        },
+        }
       });
-      if(response.ok){
-        return { valid: true };
+
+      if (response.ok) {
+        const data = await response.json();
+        const fetchedNumbers = data.incoming_phone_numbers.map(num => num.phone_number);
+
+        // Map over existing stored numbers to check status
+        const updatedStoredNumbers = twilioPhoneNumbers.map(storedNum => ({
+          ...storedNum,
+          status: fetchedNumbers.includes(storedNum.number) ? "active" : "inactive",
+        }));
+
+        // Set the updated stored numbers with statuses
+        setTwilioPhoneNumbers(updatedStoredNumbers);
+
+        // Filter out numbers that are already in the stored list
+        const uniqueNumbers = fetchedNumbers.filter(num => !twilioPhoneNumbers.some(tw => tw.number === num));
+        
+        // Add "Selected Option" as default
+        setFetchNumber(["Selected Option", ...uniqueNumbers]);
+      } else {
+        const errorData = await response.json();
+        console.error("❌ Failed to fetch Twilio phone numbers:", errorData);
+        return { success: false, error: errorData };
       }
     } catch (error) {
-      console.error("⚠️ Error Verifying Twilio Credentials:", error);
-      return { valid: false, error };
+      console.error("⚠️ Error fetching Twilio phone numbers:", error);
+      return { success: false, error };
     }
   };
 
-  const saveCustomPropertiesOfTwilio = async () => {
-    setShowLoader(true)
-    const twilioVerification = await verifyTwilioCredentials(twilioSID, twiliotoken);
-  if (!twilioVerification.valid) {
-    setShowLoader(false);
+  const fetchTwilioConversationServices = async (accountSid, authToken) => {
+    if (!accountSid || !authToken) {
+        return toast.error("Missing Twilio SID or Auth Token");
+    }
 
-    // Check if error is related to SID or Token
-    if(twilioVerification.error.code === 20003){
-      if (twilioVerification.error.message === "Authentication Error - invalid username") {
-        setInvalidSid(true);
-        toast.error("Invalid Twilio SID. Please check and try again.");
-      }
-      if (twilioVerification.error.message === "Authenticate") {
-        setInvalidToken(true);
-        toast.error("Invalid Twilio Auth Token. Please check and try again.");
-      } 
+    try {
+        const response = await fetch(`https://conversations.twilio.com/v1/Services`, {
+            method: "GET",
+            headers: {
+                "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Error Fetching Twilio Conversation Services:", errorData);
+            toast.error("Failed to fetch Twilio Conversation Services.");
+            return [];
+        }
+
+        const data = await response.json();
+        console.log("Twilio Conversation Services:", data.services);
+
+        return data.services.map(service => ({
+            sid: service.sid,
+            name: service.friendly_name || service.sid // Use friendly name if available
+        }));
+
+    } catch (error) {
+        console.error("Error Fetching Twilio Conversation Services:", error);
+        toast.error("Error fetching Twilio Conversation Services.");
+        return [];
     }
-    else {
-      toast.error("Invalid Twilio Credentials. Please check your credentials.");
-    }
-    
-    return; // **🚫 Stop execution if verification fails**
+};
+
+const handleDropdownOpen = async () => {
+  setDropdownOpen(true);
+
+  // Fetch SIDs only if the list is empty (to avoid unnecessary API calls)
+  if (serviceSidList.length === 0) {
+      const services = await fetchTwilioConversationServices(twilioSID, twiliotoken);
+      setServiceSidList(services);
   }
-    const data = [
+};
+
+const handleDropdownClose = () => {
+  setDropdownOpen(false);
+};
+
+
+const verifyTwilio = async (accountSid, authToken) => {
+  if (!accountSid || !authToken) {
+      return toast.error("Missing Twilio SID or Auth Token");
+  }
+
+  try {
+      // ✅ Verify Twilio Account Credentials
+      const accountResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+          method: "GET",
+          headers: {
+              "Authorization": "Basic " + btoa(`${accountSid}:${authToken}`)
+          },
+      });
+
+      if (!accountResponse.ok) {
+          const accountError = await accountResponse.json();
+          console.error("Twilio Account Verification Failed:", accountError);
+
+          // ✅ Handle specific error codes
+          if (accountError.code === 20003) {
+              if (accountError.message === "Authentication Error - invalid username") {
+                  setInvalidSid(true);
+                  toast.error(" Invalid Twilio SID. Please check and try again.");
+              } else if (accountError.message === "Authenticate") {
+                  setInvalidToken(true);
+                  toast.error("Invalid Twilio Auth Token. Please check and try again.");
+              }
+          } else {
+              toast.error("Invalid Twilio Credentials. Please check your credentials.");
+          }
+
+          return { valid: false, error: accountError };
+      }
+
+return { valid: true };
+
+  } catch (error) {
+      console.error("Error Verifying Twilio Credentials:", error);
+      toast.error("Error verifying Twilio credentials.");
+      return { valid: false, error };
+  }
+};
+
+const saveCustomPropertiesOfTwilio = async () => {
+  setShowLoader(true);
+
+  // ✅ Fetch existing values from Zoho CRM to compare
+  const existingCredentials = await fetchTwilioCredentials(false); // Ensure this function returns current Zoho values
+
+  // ✅ Check if any values have changed
+  const isChanged =
+      existingCredentials.twilioSID !== twilioSID ||
+      existingCredentials.twilioToken !== twiliotoken ||
+      existingCredentials.conversationServiceSid !== conversationServiceSid ||
+      JSON.stringify(existingCredentials.twilioPhoneNumbers) !== JSON.stringify(twilioPhoneNumbers) ||
+      existingCredentials.currentTwilioNumber !== currentTwilioNumber;
+
+  // ✅ If nothing has changed, save data directly without verification
+  if (!isChanged) {
+      await saveToZoho();
+      toast.success("Twilio credentials saved successfully.");
+      return;
+  }
+
+  // ✅ If values have changed, verify Twilio credentials first
+  const verificationResult = await verifyTwilio(twilioSID, twiliotoken);
+
+  if (!verificationResult.valid) {
+      setShowLoader(false);
+      return; // 🚫 Stop execution if verification fails
+  }
+
+  // ✅ Save updated values to Zoho CRM
+  await saveToZoho();
+  toast.success("Twilio credentials verified and saved successfully.");
+};
+
+// ✅ **Function to Save Data in Zoho CRM**
+const saveToZoho = async () => {
+  const data = [
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_SID", value: twilioSID },
       { apiname: "twiliophonenumbervalidatorbyupro__Twilio_Token", value: twiliotoken },
       { apiname: "twiliophonenumbervalidatorbyupro__Phone_Numbers", value: twilioPhoneNumbers },
-      { apiname: "twiliophonenumbervalidatorbyupro__Current_Twilio_Number", value: currentTwilioNumber}
-    ];
-  
-    try {
+      { apiname: "twiliophonenumbervalidatorbyupro__Current_Twilio_Number", value: currentTwilioNumber },
+      { apiname: "twiliophonenumbervalidatorbyupro__Conversation_Service_SID", value: conversationServiceSid }
+  ];
+
+  try {
       for (const item of data) {
-        const response = await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", item );
-        const parsedData = JSON.parse(response);
-        if(parsedData.status_code){
-          setShowLoader(false)
-        }
-        
+          const response = await ZOHO.CRM.CONNECTOR.invokeAPI("crm.set", item);
+          const parsedData = JSON.parse(response);
+          if (parsedData.status_code) {
+              setShowLoader(false);
+          }
       }
-      toast.success('Twilio Credintials saved sucessfully.')
-      fetchTwilioCredentials()
-    } catch (error) {
-      console.log("error", error);
-      toast.error('Failed to save credinitals. Please try again later.')
-    }
-  };
+      fetchTwilioCredentials(true); // Refresh UI with saved values
+  } catch (error) {
+      console.log("Error saving credentials:", error);
+      toast.error("Failed to save credentials. Please try again later.");
+  }
+};
 
   const handleTwilioSID = (sid) => {
     setTwilioSID(sid);
@@ -276,23 +413,57 @@ console.log("Phone Numbers: ", phoneNumbers);
     setTwilioToken(token);
   };
 
+  const handleConversationServiceSid = (sid) => {
+    const selectedService = serviceSidList.find(service => service.sid === sid);
+    setConversationServiceSid(selectedService ? { friendlyName: selectedService.name, Sid: sid } : { friendlyName: '', Sid: '' });
+};
+
+  // const handleToggle = (selectedRow) => {
+  //   // Update the currentTwilioNumber with the selected number
+  //   setCurrentTwilioNumber(selectedRow.number);
+  
+  //   // Move the selected row to the top and unselect others
+  //   const updatedRows = twilioPhoneNumbers.map((row) => ({
+  //     ...row,
+  //     toggle: row.number === selectedRow.number,
+  //   }));
+  
+  //   const selectedRowData = updatedRows.find((row) => row.number === selectedRow.number);
+  
+  //   setTwilioPhoneNumbers([
+  //     selectedRowData,
+  //     ...updatedRows.filter((row) => row.number !== selectedRow.number),
+  //   ]);
+  // };
+
   const handleToggle = (selectedRow) => {
-    // Update the currentTwilioNumber with the selected number
-    setCurrentTwilioNumber(selectedRow.number);
-  
-    // Move the selected row to the top and unselect others
+    // If there's only one row and it's already selected, toggle it off
+    if (twilioPhoneNumbers.length === 1 && selectedRow.toggle) {
+        setCurrentTwilioNumber(""); // Reset the selected number
+        setTwilioPhoneNumbers([{ ...selectedRow, toggle: false }]); // Uncheck toggle
+        return;
+    }
+
+    // ✅ Toggle selection for the clicked row
+    const isCurrentlySelected = selectedRow.toggle;
+
     const updatedRows = twilioPhoneNumbers.map((row) => ({
-      ...row,
-      toggle: row.number === selectedRow.number,
+        ...row,
+        toggle: row.number === selectedRow.number ? !isCurrentlySelected : false, // Only one can be selected
     }));
-  
+
     const selectedRowData = updatedRows.find((row) => row.number === selectedRow.number);
-  
-    setTwilioPhoneNumbers([
-      selectedRowData,
-      ...updatedRows.filter((row) => row.number !== selectedRow.number),
-    ]);
-  };
+
+    // ✅ Update state: Move the selected row to the top if toggled on
+    setTwilioPhoneNumbers(
+        selectedRowData.toggle
+            ? [selectedRowData, ...updatedRows.filter((row) => row.number !== selectedRow.number)]
+            : updatedRows // Keep original order if toggled off
+    );
+
+    // ✅ Update `currentTwilioNumber` only if toggle is ON
+    setCurrentTwilioNumber(selectedRowData.toggle ? selectedRowData.number : "");
+};
 
   const handleDelete = async (rowIndex) => {
     const updatedRows = twilioPhoneNumbers.filter((_, index) => index !== rowIndex);
@@ -354,6 +525,12 @@ console.log("Phone Numbers: ", phoneNumbers);
   }
 
   const handleSaveClick = () => {
+
+    // ✅ Check if newTwilioField contains any value (meaning user hasn't saved it to the table yet)
+    if (newTwilioField.name || newTwilioField.number || newTwilioField.status) {
+      toast.warning("⚠️ Please save the new Twilio phone number before proceeding.");
+      return; // 🚫 Stop execution until the field is saved in the table
+  }
     // If Twilio SID and Token are being set for the first time, directly save without showing the confirmation modal
     if (!initialSid && !initialToken) {
       saveCustomPropertiesOfTwilio();
@@ -370,6 +547,12 @@ console.log("Phone Numbers: ", phoneNumbers);
     }
   };
   
+  const handleIsEditing = () => {
+    setIsEditing(!isEditing)
+    if(!isEditing){
+      setNewTwilioField({name:'', number:''})
+    }
+  }
   
   const confirmSave = () => {
     setOpenConfirmModal(false);
@@ -378,16 +561,42 @@ console.log("Phone Numbers: ", phoneNumbers);
   
   return (
     <Box className="settingsContainer">
-      {/* <div className='neomorphic-container-2'>
-      <img src={neo2} alt="neo-2" />
-      </div>
-      <div className='neomorphic-container-1'>
-      <img src={neo1} alt="neo-1" />
-      </div> */}
+      {loading ? (
+        <Box className="skeletonContainer">
+          <div className="skeletonInput">
+          <Skeleton variant="rectangular" width={150} height={50} sx={{ borderRadius: "10px" }}/>
+          <Skeleton variant="rectangular" width={150} height={50} sx={{ borderRadius: "10px" }}/>
+          <Skeleton variant="rectangular" width={150} height={50} sx={{ borderRadius: "10px" }}/>
+          </div>
+          <Skeleton variant="rectangular" width={611} height={200} sx={{ borderRadius: "10px" }}/>
+          <Skeleton variant="rectangular" width={144} height={50} sx={{ borderRadius: "10px" }}/>
+        </Box>
+      ) : (
       <Box className='innerContainer'>
       <div className='inputContainer'>
         <CustomTextField id="outlined-basic" label="Account SID" variant="outlined" sx={{border: invaildSid ? '1px solid red' : "none"}} value={twilioSID} onChange={(e) => handleTwilioSID(e.target.value)}/>
         <CustomTextField id="outlined-basic" label="Account Token" type="password" variant="outlined" sx={{boder: invalidToken ? '1px solid red' : "none"}} value={twiliotoken} onChange={(e) => handleTwilioToken(e.target.value)}/>
+        {/* <CustomTextField id="outlined-basic" label="Conversation Service Sid" type="text" variant="outlined" sx={{boder: invalidServiceSid ? '1px solid red' : "none"}} value={conversationServiceSid} onChange={(e) => handleConversationServiceSid(e.target.value)}/> */}
+        <CustomFormControl fullWidth >
+    <InputLabel>Conversation Service SID</InputLabel>
+    <Select
+        id="conversation-service-sid"
+        value={conversationServiceSid.friendlyName} // ✅ Ensure it sets value correctly
+        onChange={(e) => handleConversationServiceSid(e.target.value)}
+        error={invalidServiceSid} // Shows red border if invalid
+        open={dropdownOpen}
+        onOpen={handleDropdownOpen}
+        onClose={handleDropdownClose}
+        renderValue={() => conversationServiceSid.friendlyName || "Select Service"}
+    >
+        {serviceSidList.map((service) => (
+            <MenuItem key={service.sid} value={service.sid}>
+                {service.name} {/* Shows Friendly Name or SID */}
+            </MenuItem>
+        ))}
+    </Select>
+</CustomFormControl>
+
       </div>
         <div className='neomorphic-table'>
         <NeomorphicTableContainer>
@@ -400,21 +609,8 @@ console.log("Phone Numbers: ", phoneNumbers);
       </TableRow>
     </TableHead>
 
-    {loading ? 
-    <TableBody>
-    <TableRow>
-      <CustomTableCell colSpan={3} align="center">
-        <div style={{ justifyContent: "center",
-display: "flex", height: "4rem",
-padding: "20px",
-alignItems: "center",
-fontSize: "14px"}}>
-          <CircularProgress size={17} /> 
-        </div>
-      </CustomTableCell>
-    </TableRow>
-  </TableBody>
-  : twilioPhoneNumbers.length === 0 ? (
+    {
+  twilioPhoneNumbers.length === 0 ? (
       // ✅ Show this container when no Twilio numbers are available
       <TableBody>
         <TableRow>
@@ -519,7 +715,7 @@ fontSize: "14px"}}>
           )
         }
          <Tooltip title={isEditing ? "Cancel adding": "Add new number"}>
-        <AddButton onClick={() => setIsEditing(!isEditing)}>
+        <AddButton onClick={handleIsEditing}>
           {!isEditing ? "Add" : "Cancel"}
         </AddButton>
          </Tooltip>
@@ -586,7 +782,8 @@ fontSize: "14px"}}>
 
     </div>
       </Box>
-      {/* <div className='neomorphic-text'>
+    )}
+    {/* <div className='neomorphic-text'>
         <div className='neomorphic-container-4'>
         <span>QuickSend</span>
         </div>

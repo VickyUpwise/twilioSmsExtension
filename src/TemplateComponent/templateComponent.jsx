@@ -116,7 +116,7 @@ const TemplateComponent = ({ showTemplate, handleTemplateContentChange, setShowT
 
   return (
     <div className={modalVisible? 'modalContainer': 'templateContainer'}>
-      {allTemplates.length === 0 ? (
+      {allTemplates.length === 0 && !modalVisible? (
         <div className="templateInnerContainer">
           <img src={templateImage} alt="Template" />
           <p>Make your task easy by creating some templates.</p>

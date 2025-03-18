@@ -1,19 +1,19 @@
 {
   "files": {
-    "main.css": "./static/css/main.323e3143.css",
-    "main.js": "./static/js/main.36adcc00.js",
-    "settings.css": "./static/css/settings.56382a2e.css",
-    "settings.js": "./static/js/settings.95a05ad4.js",
-    "static/media/Loading.gif": "./static/media/Loading.240be66bca97d7a67830.gif",
+    "main.css": "./static/css/main.c7cf97f0.css",
+    "main.js": "./static/js/main.7f057f0f.js",
+    "settings.css": "./static/css/settings.dc69b346.css",
+    "settings.js": "./static/js/settings.38892839.js",
+    "static/media/confused.png": "./static/media/confused.be856ca7a55ce2de5272.png",
     "static/media/reload.gif": "./static/media/reload.15a5ac2c636bb1d61fd2.gif",
     "static/media/Loader.gif": "./static/media/Loader.5e08f73adc38cda94a4d.gif",
+    "static/media/Phone.png": "./static/media/Phone.b6cd673ffd27bfa77353.png",
     "static/media/template.jpeg": "./static/media/template.df3c8d7d3b22fd96c6c9.jpeg",
-    "static/media/404Error.jpeg": "./static/media/404Error.e1079c3c86405881baf0.jpeg",
     "static/media/emptyChatLog.png": "./static/media/emptyChatLog.7d1413ec40923b1ad458.png",
     "index.html": "./index.html"
   },
   "entrypoints": [
-    "static/css/main.323e3143.css",
-    "static/js/main.36adcc00.js"
+    "static/css/main.c7cf97f0.css",
+    "static/js/main.7f057f0f.js"
   ]
 }

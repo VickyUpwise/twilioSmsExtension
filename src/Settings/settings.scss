@@ -12,6 +12,20 @@ $text-color: #ffffff; // White text color
     overflow: hidden;
     height: 95vh;
   }
+
+  .skeletonContainer{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    .skeletonInput{
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      align-items: center;
+    }
+  }
   
   .innerContainer {
     display: flex;
