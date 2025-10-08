@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+*{
+  font-family:  "Plus Jakarta Sans", sans-serif;
+}
+.bulkWrapperContainer{
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    height: 95vh;
+    box-sizing: border-box;
+
+
+    .tableContainer{
+        border: 1px solid #0087E033;
+        border-radius: 10px;
+        overflow: visible;
+
+        .deleteRecordButton{
+            border: none;
+            background: none;
+            outline: none;
+            font-size: 12px;
+            cursor: pointer;
+
+            &:hover{
+                transform: translate(1);
+                transition: transform 0.3s ease;
+            }
+        }
+    }
+}

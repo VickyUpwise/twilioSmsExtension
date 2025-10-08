@@ -1,0 +1,21 @@
+{
+  "functions": {
+    "targets": [
+      "media_uploader_function",
+      "twilioVerification",
+      "twilioHelper"
+    ],
+    "ignore": [],
+    "source": "functions",
+    "name": "uploadToTwilio",
+    "dir": "functions/media_uploader_function"
+  },
+  "routes": [
+    {
+      "path": "/media_uploader_function",
+      "type": "function",
+      "function": "media_uploader_function",
+      "method": "post"
+    }
+  ]
+}

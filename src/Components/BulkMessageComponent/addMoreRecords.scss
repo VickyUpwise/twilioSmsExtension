@@ -1,0 +1,101 @@
+
+.addMoreRecordsContainer{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: visible;
+
+    .openList, .closeList{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: none;
+        background: none;
+        color: #0087E0;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        padding: 0px;
+
+        &:hover{
+            font-size: 18px;
+            transition: font-size 0.4s ease-in-out;
+        }
+    }
+
+    .closeList{
+        transform: rotate(45deg);
+        transition: transform 0.3s ease;
+    }
+
+    .addMoreListContainer{
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        align-items: center;
+        position: absolute;
+        z-index: 100;
+        top: -9px;
+        left: 0;
+        min-width: 209px;
+        max-width: 300px;
+        background: white;
+        padding: 8px;
+        border-radius: 10px;
+        height: 250px;
+        opacity: 0;
+        box-shadow: 0px 0px 3px 0px #bdb7b799;
+        animation: strech 2s 0.2s 1 forwards;
+
+        .actionButtonsContainer{
+            display: flex;
+            justify-content: space-evenly;
+            align-items: center;
+            width: 100%;
+
+            button{
+                padding: 5px;
+                font-size: 13px;
+                border-radius: 5px;
+                padding: 10px;
+                border: none;
+                background: #0c8de2;
+                color: white;
+                outline: none;
+                cursor: pointer;
+
+                &:hover{
+                    background: #087cc9;
+                    transition: background ease 0.5s;
+                }
+
+                &:active{
+                    box-shadow: inset 0px -2px 6px #095a8bf7;
+                    transform: box-shadow ease 0.4s;
+                }
+
+                &:disabled{
+                    background: rgb(171, 168, 168);
+                    color: black;
+                    cursor: not-allowed;
+                }
+            }
+        }
+    }
+}
+
+@keyframes strech {
+    0%{
+        left: 0px;
+        opacity: 0;
+        height: 0px;
+    }
+    100%{
+        left: 64px;
+        opacity: 1;
+        height: 250px;
+    }
+}
+

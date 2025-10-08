@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "8929000000038100",
+      "name": "mediaUploader",
+      "domain": {
+        "id": "10098657318",
+        "name": "mediauploader-764980215.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "764980215",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}
