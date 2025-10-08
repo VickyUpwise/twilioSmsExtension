@@ -16,6 +16,7 @@ var axios = require('axios')
 const multer = require('multer');
 // const upload = multer({ dest: 'uploads/' });
 const FormData = require('form-data');
+const twilio = require("twilio");
 
 process.env.PWD = process.env.PWD || process.cwd();
 
@@ -30,6 +31,7 @@ expressApp.use(bodyParser.json());
 expressApp.use(bodyParser.urlencoded({ extended: false }));
 expressApp.use(errorHandler());
 expressApp.use(cors())
+expressApp.use(express.json());
 
 
 expressApp.use('/', function (req, res, next) {
@@ -85,6 +87,37 @@ expressApp.post("/verify-twilio", async (req, res) => {
 });
 
 
+expressApp.post("/get-access-token", (req, res) => {
+  try {
+      const { accountSid, apiKey, apiSecret, serviceSid, identity} = req.query;
+
+      if (!identity) {
+          return res.status(400).json({ error: "Identity is required" });
+      }
+
+      // Create Twilio Access Token
+      const AccessToken = twilio.jwt.AccessToken;
+      const ChatGrant = AccessToken.ChatGrant;
+
+      const token = new AccessToken(accountSid, apiKey, apiSecret, {
+          identity: identity, // Unique identifier for user
+          ttl: 3600, // Token expires in 1 hour
+      });
+
+      // Grant access to Twilio Conversations
+      token.addGrant(
+          new ChatGrant({
+              serviceSid: serviceSid,
+          })
+      );
+
+      console.log("✅ Access Token Generated");
+      res.json({ token: token.toJwt() }); // Send JWT token to frontend
+  } catch (error) {
+      console.error("❌ Error generating access token:", error);
+      res.status(500).json({ error: "Server error" });
+  }
+});
 
 var options = {
   key: fs.readFileSync('./key.pem'),
